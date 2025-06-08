@@ -272,7 +272,8 @@ if (!app.Environment.IsDevelopment())
 // Then static files
 var provider = new FileExtensionContentTypeProvider();
 // Add MIME type mappings for JavaScript modules
-provider.Mappings[".js"] = "text/javascript; charset=utf-8";
+provider.Mappings[".js"] = "application/javascript; charset=utf-8";
+provider.Mappings[".mjs"] = "application/javascript; charset=utf-8";
 
 app.UseStaticFiles(new StaticFileOptions
 {
@@ -280,10 +281,10 @@ app.UseStaticFiles(new StaticFileOptions
     OnPrepareResponse = ctx =>
     {
         // Ensure JavaScript files are served with the correct MIME type and CORS headers
-        if (ctx.File.Name.EndsWith(".js"))
+        if (ctx.File.Name.EndsWith(".js") || ctx.File.Name.EndsWith(".mjs"))
         {
             // Use Set instead of Add to avoid duplicate headers
-            ctx.Context.Response.Headers["Content-Type"] = "text/javascript; charset=utf-8";
+            ctx.Context.Response.Headers["Content-Type"] = "application/javascript; charset=utf-8";
             // Add CORS headers for JavaScript modules
             ctx.Context.Response.Headers["Access-Control-Allow-Origin"] = "*";
             // Add cache control to prevent caching during development
