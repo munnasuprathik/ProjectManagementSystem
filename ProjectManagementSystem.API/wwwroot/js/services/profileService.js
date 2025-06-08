@@ -1,5 +1,5 @@
 import { apiClient } from '../api/apiClient.js';
-import { STORAGE_KEYS, USER_ROLES } from '../constants/appConstants.js';
+import { STORAGE_KEYS, USER_ROLES } from '/js/constants/appConstants.js';
 import { Toast, LoadingOverlay } from '../utils/uiUtils.js';
 import { authService } from './authService.js';
 

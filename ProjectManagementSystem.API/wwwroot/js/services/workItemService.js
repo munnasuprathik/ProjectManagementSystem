@@ -1,5 +1,5 @@
 import { apiClient } from '../api/apiClient.js';
-import { WORK_ITEM_STATUSES, WORK_ITEM_PRIORITIES } from '../constants/appConstants.js';
+import { WORK_ITEM_STATUSES, WORK_ITEM_PRIORITIES } from '/js/constants/appConstants.js';
 import { Toast, LoadingOverlay } from '../utils/uiUtils.js';
 
 class WorkItemService {

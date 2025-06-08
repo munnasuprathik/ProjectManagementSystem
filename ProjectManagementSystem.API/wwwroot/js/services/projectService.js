@@ -1,5 +1,5 @@
 import { apiClient } from '../api/apiClient.js';
-import { PROJECT_STATUSES } from '../constants/appConstants.js';
+import { PROJECT_STATUSES } from '/js/constants/appConstants.js';
 import { Toast, LoadingOverlay } from '../utils/uiUtils.js';
 
 class ProjectService {

@@ -4,7 +4,7 @@ import { workItemService } from './services/workItemService.js';
 import { projectService } from './services/projectService.js';
 import { profileService } from './services/profileService.js';
 import { Toast, LoadingOverlay } from './utils/uiUtils.js';
-import { WORK_ITEM_STATUSES, PROJECT_STATUSES, USER_ROLES } from './constants/appConstants.js';
+import { WORK_ITEM_STATUSES, PROJECT_STATUSES, USER_ROLES } from '/js/constants/appConstants.js';
 
 // DOM Elements
 const userNameEl = document.getElementById('userName');

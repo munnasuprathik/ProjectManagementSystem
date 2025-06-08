@@ -1,5 +1,5 @@
 import { apiClient } from '../api/apiClient.js';
-import { WORK_ITEM_STATUSES, PROJECT_STATUSES, USER_ROLES } from '../constants/appConstants.js';
+import { WORK_ITEM_STATUSES, PROJECT_STATUSES, USER_ROLES } from '/js/constants/appConstants.js';
 import { Toast, LoadingOverlay } from '../utils/uiUtils.js';
 import { workItemService } from './workItemService.js';
 import { projectService } from './projectService.js';
