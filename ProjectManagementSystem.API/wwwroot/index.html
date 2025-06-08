@@ -218,7 +218,7 @@
                         if (data.token) {
                             console.log('Token received, storing in localStorage');
                             // Store the token and user data
-                            localStorage.setItem('authToken', data.token);
+                            localStorage.setItem('auth_token', data.token);
                             localStorage.setItem('user', JSON.stringify({
                                 id: data.userId || data.id,
                                 email: data.email,
