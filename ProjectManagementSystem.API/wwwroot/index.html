@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Management System - Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="auth-page">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-5">
+                <div class="card auth-card">
+                    <div class="card-body p-5">
+                        <div class="text-center mb-4">
+                            <h2>Project Management System</h2>
+                            <p class="text-muted">Sign in to your account</p>
+                        </div>
+
+                        <!-- Login Form -->
+                        <form id="loginForm">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email address</label>
+                                <input type="email" class="form-control" id="email" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="password" required>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary">Sign In</button>
+                                <div class="text-center mt-3">
+                                    <a href="#" id="registerLink">Register as Employee</a>
+                                </div>
+                                <div class="divider my-3">
+                                    <span class="divider-text">OR</span>
+                                </div>
+                                <button type="button" id="managerLogin" class="btn btn-outline-primary">
+                                    Login as Manager
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Registration Modal -->
+    <div class="modal fade" id="registerModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Register as Employee</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="registerForm">
+                        <div class="mb-3">
+                            <label for="regFullName" class="form-label">Full Name</label>
+                            <input type="text" class="form-control" id="regFullName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="regEmail" class="form-label">Email address</label>
+                            <input type="email" class="form-control" id="regEmail" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="regPassword" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="regPassword" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="regConfirmPassword" class="form-label">Confirm Password</label>
+                            <input type="password" class="form-control" id="regConfirmPassword" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="registerBtn">Register</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Debug script -->
+    <script>
+        // Wait for the DOM to be fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM fully loaded');
+            
+            // Get all elements
+            const loginForm = document.getElementById('loginForm');
+            const registerLink = document.getElementById('registerLink');
+            const managerLoginBtn = document.getElementById('managerLogin');
+            const registerBtn = document.getElementById('registerBtn');
+            const registerModalEl = document.getElementById('registerModal');
+            let registerModal = null;
+            
+            // Initialize Bootstrap modal
+            if (registerModalEl) {
+                registerModal = new bootstrap.Modal(registerModalEl);
+                console.log('Bootstrap modal initialized');
+            }
+            
+            // Debug log all elements
+            console.log('Login Form:', loginForm);
+            console.log('Register Link:', registerLink);
+            console.log('Manager Login Button:', managerLoginBtn);
+            console.log('Register Button:', registerBtn);
+            
+            // Add event listeners
+            if (registerLink) {
+                registerLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Register link clicked');
+                    if (registerModal) {
+                        registerModal.show();
+                        console.log('Modal shown');
+                    } else {
+                        console.error('Modal not initialized');
+                    }
+                });
+            }
+            
+            if (managerLoginBtn) {
+                managerLoginBtn.addEventListener('click', function() {
+                    console.log('Manager login clicked');
+                    // Auto-fill manager credentials
+                    const emailInput = document.getElementById('email');
+                    const passwordInput = document.getElementById('password');
+                    if (emailInput && passwordInput) {
+                        emailInput.value = 'manager@company.com';
+                        passwordInput.value = 'Manager123!';
+                        console.log('Manager credentials filled');
+                        // Submit the form
+                        if (loginForm) loginForm.dispatchEvent(new Event('submit'));
+                    }
+                });
+            }
+            
+            if (registerBtn) {
+                registerBtn.addEventListener('click', async function() {
+                    console.log('Register button clicked');
+                    const fullName = document.getElementById('regFullName')?.value.trim();
+                    const email = document.getElementById('regEmail')?.value.trim();
+                    const password = document.getElementById('regPassword')?.value;
+                    const confirmPassword = document.getElementById('regConfirmPassword')?.value;
+                    
+                    // Basic validation
+                    if (!fullName || !email || !password || !confirmPassword) {
+                        alert('Please fill in all fields');
+                        return;
+                    }
+                    
+                    if (password !== confirmPassword) {
+                        alert('Passwords do not match');
+                        return;
+                    }
+                    
+                    if (password.length < 8) {
+                        alert('Password must be at least 8 characters long');
+                        return;
+                    }
+                    
+                    // Email validation
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(email)) {
+                        alert('Please enter a valid email address');
+                        return;
+                    }
+                    
+                    try {
+                        console.log('Registration attempt:', { email });
+                        const response = await fetch('/api/Account/register', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                fullName: fullName,
+                                email: email,
+                                password: password,
+                                confirmPassword: confirmPassword,
+                                role: 'Employee'
+                            })
+                        });
+                        
+                        console.log('Response status:', response.status);
+                        const responseText = await response.text();
+                        console.log('Raw response:', responseText);
+                        
+                        let data;
+                        try {
+                            data = JSON.parse(responseText);
+                        } catch (e) {
+                            console.error('Failed to parse JSON response:', e);
+                            throw new Error('Invalid response from server');
+                        }
+                        
+                        console.log('Parsed response data:', data);
+                        
+                        if (!response.ok) {
+                            throw new Error(data.message || `Registration failed with status ${response.status}`);
+                        }
+                        
+                        // Close the modal and clear the form
+                        if (registerModal) {
+                            registerModal.hide();
+                            const registerForm = document.getElementById('registerForm');
+                            if (registerForm) registerForm.reset();
+                        }
+                        
+                        // If we have a token, use it to log in automatically
+                        if (data.token) {
+                            console.log('Token received, storing in localStorage');
+                            // Store the token and user data
+                            localStorage.setItem('authToken', data.token);
+                            localStorage.setItem('user', JSON.stringify({
+                                id: data.userId || data.id,
+                                email: data.email,
+                                role: data.role || 'Employee',
+                                fullName: data.fullName || fullName
+                            }));
+                            
+                            console.log('Stored auth data, redirecting...');
+                            // Redirect to the appropriate dashboard
+                            const dashboardUrl = (data.role === 'Manager') ? '/manager-dashboard.html' : '/employee-dashboard.html';
+                            console.log('Redirecting to:', dashboardUrl);
+                            window.location.href = dashboardUrl;
+                        } else {
+                            console.log('No token in response, showing success message');
+                            // If no token, show success message and let user log in
+                            alert('Registration successful! Please log in with your credentials.');
+                            // Auto-fill the login form
+                            const emailInput = document.getElementById('email');
+                            if (emailInput) emailInput.value = email;
+                            document.getElementById('password')?.focus();
+                        }
+                        
+                    } catch (error) {
+                        console.error('Registration error:', error);
+                        alert(error.message || 'Registration failed. Please try again.');
+                    }
+                });
+            }
+            
+            // Import the authService and apiClient
+            Promise.all([
+                import('/js/services/authService.js'),
+                import('/js/api/apiClient.js')
+            ]).then(([authModule, apiModule]) => {
+                // authService is exported as both default and named export
+                const authService = authModule.default || authModule.authService;
+                const apiClient = apiModule.apiClient;
+                
+                // Make authService globally available for debugging
+                window.authService = authService;
+
+                if (loginForm) {
+                    loginForm.addEventListener('submit', async function(e) {
+                        e.preventDefault();
+                        const email = document.getElementById('email')?.value.trim();
+                        const password = document.getElementById('password')?.value;
+                        
+                        if (!email || !password) {
+                            alert('Please enter both email and password');
+                            return;
+                        }
+                        
+                        try {
+                            console.log('Login attempt with authService:', { email });
+                            
+                            // Use authService.login which handles token storage and user session
+                            const user = await authService.login(email, password);
+                            console.log('Login successful, user:', user);
+                            
+                            // Redirect based on role
+                            if (user.role === 'Manager') {
+                                window.location.href = '/manager-dashboard.html';
+                            } else {
+                                window.location.href = '/employee-dashboard.html';
+                            }
+                            
+                        } catch (error) {
+                            console.error('Login error:', error);
+                            alert(error.message || 'Login failed. Please check your credentials and try again.');
+                        }
+                    });
+                }
+            }).catch(error => {
+                console.error('Failed to load auth modules:', error);
+                alert('Failed to initialize authentication. Please refresh the page and try again.');
+            });
+            
+            // Auto-fill test credentials in development
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                const emailInput = document.getElementById('email');
+                const passwordInput = document.getElementById('password');
+                if (emailInput && passwordInput) {
+                    emailInput.value = 'test@example.com';
+                    passwordInput.value = 'Test123!';
+                    console.log('Test credentials filled');
+                }
+            }
+        });
+    </script>
+    
+    
+    <!-- Original app.js as fallback -->
+    <script type="module" src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manager Dashboard - Project Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Project Management System</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" id="dashboardLink">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="projectsLink">Projects</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="workItemsLink">Work Items</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="teamLink">Team</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="reportsLink">Reports</a>
+                    </li>
+                </ul>
+                <div class="d-flex align-items-center">
+                    <div class="dropdown">
+                        <button class="btn btn-outline-light dropdown-toggle d-flex align-items-center" type="button" id="userDropdown" data-bs-toggle="dropdown">
+                            <div class="me-2 d-flex align-items-center justify-content-center bg-light text-primary rounded-circle" style="width: 32px; height: 32px;" id="userInitials">
+                                <!-- User initials will be inserted here -->
+                            </div>
+                            <span id="userName">Loading...</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" id="profileLink">My Profile</a></li>
+                            <li><a class="dropdown-item" href="#" id="settingsLink">Settings</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#" id="logoutLink">Logout</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid py-4">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-lg-3 col-xl-2 mb-4 d-none d-lg-block">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4">Quick Actions</h5>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary mb-2" id="createProjectBtn">
+                                <i class="bi bi-plus-circle me-2"></i>New Project
+                            </button>
+                            <button class="btn btn-outline-primary mb-2" id="createWorkItemBtn">
+                                <i class="bi bi-plus-circle me-2"></i>New Work Item
+                            </button>
+                            <button class="btn btn-outline-secondary mb-2" id="addTeamMemberBtn">
+                                <i class="bi bi-person-plus me-2"></i>Add Team Member
+                            </button>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
+                        <h6 class="text-uppercase text-muted mb-3">Quick Filters</h6>
+                        <div class="list-group list-group-flush">
+                            <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center active">
+                                All Work Items
+                                <span class="badge bg-primary rounded-pill" id="allWorkItemsCount">0</span>
+                            </a>
+                            <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                My Work Items
+                                <span class="badge bg-primary rounded-pill" id="myWorkItemsCount">0</span>
+                            </a>
+                            <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                Overdue
+                                <span class="badge bg-danger rounded-pill" id="overdueItemsCount">0</span>
+                            </a>
+                            <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                Due Soon
+                                <span class="badge bg-warning rounded-pill" id="dueSoonItemsCount">0</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main Content Area -->
+            <div class="col-lg-9 col-xl-10">
+                <!-- Stats Cards -->
+                <div class="row mb-4">
+                    <div class="col-md-6 col-xl-3 mb-4">
+                        <div class="card bg-primary text-white h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-uppercase mb-1">Active Projects</h6>
+                                        <h2 class="mb-0" id="activeProjectsCount">0</h2>
+                                    </div>
+                                    <i class="bi bi-folder2-open fs-1 opacity-50"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-xl-3 mb-4">
+                        <div class="card bg-success text-white h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-uppercase mb-1">Team Members</h6>
+                                        <h2 class="mb-0" id="teamMembersCount">0</h2>
+                                    </div>
+                                    <i class="bi bi-people fs-1 opacity-50"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-xl-3 mb-4">
+                        <div class="card bg-warning text-dark h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-uppercase mb-1">Work Items</h6>
+                                        <h2 class="mb-0" id="totalWorkItemsCount">0</h2>
+                                    </div>
+                                    <i class="bi bi-list-task fs-1 opacity-50"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-xl-3 mb-4">
+                        <div class="card bg-info text-white h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-uppercase mb-1">Avg. Performance</h6>
+                                        <h2 class="mb-0" id="avgPerformance">0%</h2>
+                                    </div>
+                                    <i class="bi bi-graph-up fs-1 opacity-50"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="row mb-4">
+                    <div class="col-lg-8 mb-4">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Project Progress</h5>
+                                <div id="projectProgressChart" style="height: 300px;">
+                                    <!-- Chart will be rendered here -->
+                                    <div class="text-center text-muted py-5">
+                                        <div class="spinner-border" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2 mb-0">Loading project data...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 mb-4">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Work Items by Status</h5>
+                                <div id="workItemsByStatusChart" style="height: 300px;">
+                                    <!-- Chart will be rendered here -->
+                                    <div class="text-center text-muted py-5">
+                                        <div class="spinner-border" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2 mb-0">Loading work items data...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity & Upcoming Deadlines -->
+                <div class="row">
+                    <div class="col-lg-7 mb-4">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="card-title mb-0">Recent Activity</h5>
+                                    <a href="#" class="btn btn-sm btn-outline-secondary">View All</a>
+                                </div>
+                                <div id="recentActivityList">
+                                    <!-- Activity items will be inserted here -->
+                                    <div class="text-center text-muted py-4">
+                                        <div class="spinner-border spinner-border-sm" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2 mb-0">Loading recent activity...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-5 mb-4">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="card-title mb-0">Upcoming Deadlines</h5>
+                                    <a href="#" class="btn btn-sm btn-outline-secondary">View All</a>
+                                </div>
+                                <div id="upcomingDeadlinesList">
+                                    <!-- Deadline items will be inserted here -->
+                                    <div class="text-center text-muted py-4">
+                                        <div class="spinner-border spinner-border-sm" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2 mb-0">Loading upcoming deadlines...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100">
+        <!-- Toasts will be inserted here -->
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type="module" src="/js/manager-dashboard.js"></script>
+</body>
+</html>
