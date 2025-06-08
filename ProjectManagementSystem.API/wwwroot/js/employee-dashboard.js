@@ -3,7 +3,7 @@ import { dashboardService } from './services/dashboardService.js';
 import { workItemService } from './services/workItemService.js';
 import { profileService } from './services/profileService.js';
 import { Toast, LoadingOverlay } from './utils/uiUtils.js';
-import { WORK_ITEM_STATUSES, WORK_ITEM_PRIORITIES } from './constants/appConstants.js';
+import { WORK_ITEM_STATUSES, WORK_ITEM_PRIORITIES } from '/js/constants/appConstants.js';
 
 // DOM Elements
 const profileNameEl = document.getElementById('profileName');

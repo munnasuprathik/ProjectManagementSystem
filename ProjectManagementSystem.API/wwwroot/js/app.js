@@ -1,6 +1,6 @@
-import { authService } from './services/authService.js';
-import { profileService } from './services/profileService.js';
-import { Toast, LoadingOverlay } from './utils/uiUtils.js';
+import { authService } from '/js/services/authService.js';
+import { profileService } from '/js/services/profileService.js';
+import { Toast, LoadingOverlay } from '/js/utils/uiUtils.js';
 
 // DOM Elements
 const loginForm = document.getElementById('loginForm');

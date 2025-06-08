@@ -1,6 +1,6 @@
-import { apiClient } from '../api/apiClient.js';
-import { STORAGE_KEYS, USER_ROLES, TOKEN_REFRESH_INTERVAL } from '../constants/appConstants.js';
-import { Toast } from '../utils/uiUtils.js';
+import { apiClient } from '/js/api/apiClient.js';
+import { STORAGE_KEYS, USER_ROLES, TOKEN_REFRESH_INTERVAL } from '/js/constants/appConstants.js';
+import { Toast } from '/js/utils/uiUtils.js';
 
 class AuthService {
     constructor() {
