@@ -22,6 +22,9 @@ class ApiClient {
         console.log('Setting authentication token');
         this.token = token;
         localStorage.setItem('auth_token', token);
+        
+        // Also store in authToken for backward compatibility
+        localStorage.setItem('authToken', token);
     }
     
     // Alias for setToken for backward compatibility
@@ -44,7 +47,8 @@ class ApiClient {
     getToken() {
         // Check memory first, then localStorage
         if (!this.token) {
-            this.token = localStorage.getItem('auth_token');
+            // Try both storage keys for backward compatibility
+            this.token = localStorage.getItem('auth_token') || localStorage.getItem('authToken');
         }
         
         // Validate token format if it exists
@@ -87,6 +91,7 @@ class ApiClient {
         
         // Clear all auth-related data from storage
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('authToken'); // Clear both token keys
         localStorage.removeItem('user');
         
         // Clear any ongoing requests
@@ -102,6 +107,57 @@ class ApiClient {
         this.clearAuth();
     }
 
+    // Check if a JWT token is expired
+    _isTokenExpired(token) {
+        try {
+            // JWT tokens consist of three parts: header.payload.signature
+            const parts = token.split('.');
+            if (parts.length !== 3) {
+                console.warn('Invalid token format');
+                return true;
+            }
+            
+            // Decode the payload (middle part)
+            const payload = JSON.parse(atob(parts[1]));
+            
+            // Check if the token has an expiration claim
+            if (!payload.exp) {
+                console.warn('Token has no expiration date');
+                return false;
+            }
+            
+            // exp is in seconds, Date.now() is in milliseconds
+            const expiration = payload.exp * 1000;
+            const now = Date.now();
+            
+            // Add a 5-minute buffer to refresh the token before it actually expires
+            const bufferTime = 5 * 60 * 1000; // 5 minutes in milliseconds
+            
+            return now >= (expiration - bufferTime);
+        } catch (error) {
+            console.error('Error checking token expiration:', error);
+            return true; // Assume token is expired if we can't parse it
+        }
+    }
+    
+    // Refresh the authentication token
+    async refreshToken() {
+        try {
+            const response = await this.fetch(API_ENDPOINTS.AUTH.REFRESH, {
+                method: 'POST'
+            });
+            
+            if (response && response.token) {
+                return response.token;
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('Failed to refresh token:', error);
+            return null;
+        }
+    }
+    
     // Helper method to handle fetch requests
     async fetch(resource, options = {}) {
         const headers = {

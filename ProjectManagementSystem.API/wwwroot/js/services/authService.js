@@ -410,7 +410,7 @@ export const authService = new AuthService();
 // Initialize auth service when the module is loaded
 if (authService.checkAuth()) {
     // Verify the token is still valid
-    authService.getCurrentUserProfile().catch(() => {
+    authService.getCurrentUser().catch(() => {
         // If token is invalid, log out
         authService.logout();
     });

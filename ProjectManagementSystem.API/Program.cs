@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -269,7 +270,29 @@ if (!app.Environment.IsDevelopment())
 }
 
 // Then static files
-app.UseStaticFiles();
+var provider = new FileExtensionContentTypeProvider();
+// Add MIME type mappings for JavaScript modules
+provider.Mappings[".js"] = "text/javascript; charset=utf-8";
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    ContentTypeProvider = provider,
+    OnPrepareResponse = ctx =>
+    {
+        // Ensure JavaScript files are served with the correct MIME type and CORS headers
+        if (ctx.File.Name.EndsWith(".js"))
+        {
+            // Use Set instead of Add to avoid duplicate headers
+            ctx.Context.Response.Headers["Content-Type"] = "text/javascript; charset=utf-8";
+            // Add CORS headers for JavaScript modules
+            ctx.Context.Response.Headers["Access-Control-Allow-Origin"] = "*";
+            // Add cache control to prevent caching during development
+            ctx.Context.Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+            ctx.Context.Response.Headers["Pragma"] = "no-cache";
+            ctx.Context.Response.Headers["Expires"] = "0";
+        }
+    }
+});
 
 // Enable response compression
 app.UseResponseCompression();
