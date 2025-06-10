@@ -44,83 +44,63 @@ namespace ProjectManagementSystem.API.Controllers
             var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
 
             _logger.LogInformation($"GetWorkItems called with projectId: {projectId}, User: {userId}, Role: {userRole}");
-            _logger.LogInformation($"Request query string: {Request.QueryString}");
 
-            // Start with base query
-            IQueryable<WorkItem> query = _context.WorkItems
-                .Include(wi => wi.Project)
-                .Include(wi => wi.AssignedTo)
-                .Include(wi => wi.CreatedBy);
-
-            // Apply project filter first if projectId is provided and valid
-            if (projectId.HasValue && projectId > 0)
+            try
             {
-                _logger.LogInformation($"Applying project filter for project ID: {projectId}");
-                query = query.Where(wi => wi.ProjectId == projectId.Value);
-                
-                // Log the filtered count
-                var filteredCount = await query.CountAsync();
-                _logger.LogInformation($"Found {filteredCount} work items for project {projectId} after project filter");
+                // Start with base query
+                var query = _context.WorkItems
+                    .Include(wi => wi.Project)
+                    .Include(wi => wi.AssignedTo)
+                    .Include(wi => wi.CreatedBy)
+                    .AsQueryable();
+
+                // Apply project filter if projectId is provided
+                if (projectId.HasValue)
+                {
+                    _logger.LogInformation($"Filtering by project ID: {projectId}");
+                    query = query.Where(wi => wi.ProjectId == projectId.Value);
+                }
+
+                // Apply role-based filtering
+                if (userRole == "Employee")
+                {
+                    query = query.Where(wi => wi.AssignedToId == userId);
+                }
+
+                // Log the final query
+                var sql = query.ToQueryString();
+                _logger.LogInformation($"SQL Query: {sql}");
+
+                // Execute the query
+                var items = await query
+                    .OrderByDescending(wi => wi.CreatedAt)
+                    .Select(wi => new WorkItemDto
+                    {
+                        WorkItemId = wi.WorkItemId,
+                        WorkItemName = wi.WorkItemName,
+                        Description = wi.Description,
+                        Priority = wi.Priority,
+                        Status = wi.Status,
+                        CreatedAt = wi.CreatedAt,
+                        UpdatedAt = wi.UpdatedAt,
+                        Deadline = wi.Deadline,
+                        ProjectId = wi.ProjectId,
+                        ProjectName = wi.Project.ProjectName,
+                        AssignedToId = wi.AssignedToId,
+                        AssignedToName = wi.AssignedTo.UserName,
+                        CreatedById = wi.CreatedById,
+                        CreatedByName = wi.CreatedBy.UserName
+                    })
+                    .ToListAsync();
+
+                _logger.LogInformation($"Returning {items.Count} work items");
+                return Ok(items);
             }
-            else
+            catch (Exception ex)
             {
-                _logger.LogInformation("No valid project ID provided, project filter not applied");
+                _logger.LogError(ex, "Error fetching work items");
+                return StatusCode(500, "An error occurred while fetching work items");
             }
-
-            // Apply role-based filtering
-            if (userRole == "Employee")
-            {
-                _logger.LogInformation($"Applying employee filter for user ID: {userId}");
-                query = query.Where(wi => wi.AssignedToId == userId);
-                
-                // Log the final count after all filters
-                var finalCount = await query.CountAsync();
-                _logger.LogInformation($"Found {finalCount} work items after all filters");
-            }
-            else
-            {
-                _logger.LogInformation("User is a manager, no additional filters applied");
-            }
-
-            // Employees can only see their own work items
-            if (userRole == "Employee")
-            {
-                _logger.LogInformation($"Filtering work items for employee: {userId}");
-                query = query.Where(wi => wi.AssignedToId == userId);
-            }
-            else
-            {
-                _logger.LogInformation("User is a manager, showing all work items");
-            }
-
-            var sql = query.ToQueryString();
-            _logger.LogInformation($"Generated SQL query: {sql}");
-
-            var workItemsQuery = await query
-                .OrderByDescending(wi => wi.CreatedAt)
-                .ToListAsync();
-                
-            _logger.LogInformation($"Found {workItemsQuery.Count} work items matching the criteria");
-
-            var workItems = workItemsQuery.Select(wi => new WorkItemDto
-            {
-                WorkItemId = wi.WorkItemId,
-                WorkItemName = wi.WorkItemName,
-                Description = wi.Description,
-                Priority = wi.Priority,
-                Status = wi.Status,
-                CreatedAt = wi.CreatedAt,
-                UpdatedAt = wi.UpdatedAt,
-                Deadline = wi.Deadline != DateTime.MinValue ? wi.Deadline : (DateTime?)null,
-                ProjectId = wi.ProjectId,
-                ProjectName = wi.Project?.ProjectName ?? string.Empty,
-                AssignedToId = wi.AssignedToId ?? string.Empty,
-                AssignedToName = wi.AssignedTo?.UserName ?? string.Empty,
-                CreatedById = wi.CreatedById ?? string.Empty,
-                CreatedByName = wi.CreatedBy?.UserName ?? string.Empty
-            }).ToList();
-
-            return Ok(workItems);
         }
 
         // GET: api/WorkItems/5
@@ -267,6 +247,7 @@ namespace ProjectManagementSystem.API.Controllers
             var workItem = await _context.WorkItems
                 .Include(wi => wi.Project)
                 .Include(wi => wi.AssignedTo)
+                .ThenInclude(u => u.Profile)
                 .Include(wi => wi.CreatedBy)
                 .FirstOrDefaultAsync(wi => wi.WorkItemId == id);
 
@@ -283,6 +264,16 @@ namespace ProjectManagementSystem.API.Controllers
 
             var isAssignedTo = workItem.AssignedToId == userId;
             var isManager = User.IsInRole("Manager");
+
+            // For managers, bypass the assigned user check for all status changes
+            if (!isManager)
+            {
+                // For non-managers, check if they are assigned to the work item
+                if (!isAssignedTo)
+                {
+                    return BadRequest("You are not assigned to this work item");
+                }
+            }
 
             // Enforce status transition rules
             var validTransition = IsValidStatusTransition(workItem.Status, statusDto.Status, isManager, isAssignedTo);
@@ -302,12 +293,19 @@ namespace ProjectManagementSystem.API.Controllers
             }
 
             // Update performance metrics based on status change
-            if (statusDto.Status == "Done" || (statusDto.Status == "InProgress" && oldStatus == "Review") || statusDto.Status == "Rejected")
+            if (statusDto.Status == "Done" || statusDto.Status == "Rejected")
             {
                 var isAccepted = statusDto.Status == "Done";
-                if (workItem.AssignedTo?.Profile != null)
+                if (!string.IsNullOrEmpty(workItem.AssignedToId))
                 {
-                    workItem.AssignedTo.Profile.UpdatePerformance(isAccepted);
+                    if (isAccepted)
+                    {
+                        await _performanceService.UpdateOnWorkItemApprovedAsync(workItem.AssignedToId);
+                    }
+                    else
+                    {
+                        await _performanceService.UpdateOnWorkItemRejectedAsync(workItem.AssignedToId);
+                    }
                 }
             }
 
@@ -364,12 +362,32 @@ namespace ProjectManagementSystem.API.Controllers
 
         private (bool isValid, string errorMessage) IsValidStatusTransition(string currentStatus, string newStatus, bool isManager, bool isAssignedTo)
         {
-            // Define valid transitions
+            // Managers can make any valid status transition
+            if (isManager)
+            {
+                // Define manager's allowed transitions
+                var managerTransitions = new Dictionary<string, List<string>>
+                {
+                    ["ToDo"] = new List<string> { "InProgress", "Done", "Rejected" },
+                    ["InProgress"] = new List<string> { "Review", "Done", "Rejected" },
+                    ["Review"] = new List<string> { "Done", "InProgress", "Rejected" },
+                    ["Done"] = new List<string> { "InProgress", "Review" },
+                    ["Rejected"] = new List<string> { "InProgress", "Done" }
+                };
+
+                if (managerTransitions.ContainsKey(currentStatus) && 
+                    managerTransitions[currentStatus].Contains(newStatus))
+                {
+                    return (true, string.Empty);
+                }
+            }
+
+            // For employees, use the standard workflow
             var validTransitions = new Dictionary<string, List<string>>
             {
                 ["ToDo"] = new List<string> { "InProgress" },
                 ["InProgress"] = new List<string> { "Review" },
-                ["Review"] = isManager ? new List<string> { "Done", "InProgress" } : new List<string>(),
+                ["Review"] = new List<string>(),
                 ["Done"] = new List<string>(),
                 ["Rejected"] = new List<string> { "InProgress" }
             };
@@ -382,11 +400,6 @@ namespace ProjectManagementSystem.API.Controllers
             }
 
             // Additional validation for role-based transitions
-            if (newStatus == "Done" && !isManager)
-            {
-                return (false, "Only managers can mark work items as Done");
-            }
-
             if (newStatus == "InProgress" && !isAssignedTo)
             {
                 return (false, "Only the assigned employee can start working on this item");
