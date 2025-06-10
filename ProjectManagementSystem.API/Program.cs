@@ -16,10 +16,6 @@ var builder = WebApplication.CreateBuilder(args);
 // Register application services
 builder.Services.AddScoped<IWorkloadService, WorkloadService>();
 builder.Services.AddScoped<IPerformanceService, PerformanceService>();
-builder.Services.AddScoped<IEmailService, EmailService>();
-
-// Configure EmailSettings from appsettings.json
-builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? 
     throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
@@ -31,9 +27,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // Register services with their dependencies
 builder.Services.AddScoped<IJwtService, JwtService>();
-builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IWorkloadService, WorkloadService>();
 builder.Services.AddScoped<IPerformanceService, PerformanceService>();
+
 
 // Add logging
 builder.Services.AddLogging(configure => configure.AddConsole());
@@ -269,29 +265,24 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
-// Then static files
+// Configure static files with proper MIME types and caching
 var provider = new FileExtensionContentTypeProvider();
-// Add MIME type mappings for JavaScript modules
 provider.Mappings[".js"] = "application/javascript; charset=utf-8";
 provider.Mappings[".mjs"] = "application/javascript; charset=utf-8";
+provider.Mappings[".module"] = "application/javascript";
+provider.Mappings[".css"] = "text/css; charset=utf-8";
+provider.Mappings[".html"] = "text/html; charset=utf-8";
 
+// Serve all static files from wwwroot
 app.UseStaticFiles(new StaticFileOptions
 {
     ContentTypeProvider = provider,
     OnPrepareResponse = ctx =>
     {
-        // Ensure JavaScript files are served with the correct MIME type and CORS headers
-        if (ctx.File.Name.EndsWith(".js") || ctx.File.Name.EndsWith(".mjs"))
-        {
-            // Use Set instead of Add to avoid duplicate headers
-            ctx.Context.Response.Headers["Content-Type"] = "application/javascript; charset=utf-8";
-            // Add CORS headers for JavaScript modules
-            ctx.Context.Response.Headers["Access-Control-Allow-Origin"] = "*";
-            // Add cache control to prevent caching during development
-            ctx.Context.Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
-            ctx.Context.Response.Headers["Pragma"] = "no-cache";
-            ctx.Context.Response.Headers["Expires"] = "0";
-        }
+        // Cache control for development
+        ctx.Context.Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+        ctx.Context.Response.Headers["Pragma"] = "no-cache";
+        ctx.Context.Response.Headers["Expires"] = "0";
     }
 });
 

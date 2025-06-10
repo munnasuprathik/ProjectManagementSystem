@@ -27,7 +27,7 @@ namespace ProjectManagementSystem.API.Models
         
         [Required]
         [MaxLength(20)]
-        [RegularExpression("^(ToDo|InProgress|Review|Done)$", ErrorMessage = "Status must be one of: ToDo, InProgress, Review, Done")]
+        [RegularExpression("^(ToDo|InProgress|Review|Done|Rejected)$", ErrorMessage = "Status must be one of: ToDo, InProgress, Review, Done, Rejected")]
         public string Status { get; set; } = "ToDo";
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

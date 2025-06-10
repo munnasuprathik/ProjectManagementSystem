@@ -1,391 +1,430 @@
-import { authService } from './services/authService.js';
-import { profileService } from './services/profileService.js';
-import { Toast, LoadingOverlay } from './utils/uiUtils.js';
+import { Router } from './router.js';
+import { auth } from './auth.js';
+import { renderLoginView } from './views/auth.js';
+import { renderEmployeeDashboard } from './views/dashboard.js';
+import { renderManagerDashboard } from './views/dashboard.js';
 
-// DOM Elements
-const loginForm = document.getElementById('loginForm');
-const registerForm = document.getElementById('registerForm');
-const registerLink = document.getElementById('registerLink');
-const registerBtn = document.getElementById('registerBtn');
-const managerLoginBtn = document.getElementById('managerLogin');
-const registerModal = new bootstrap.Modal(document.getElementById('registerModal'));
+// Initialize router
+const router = new Router();
 
-// Check if running in development mode
-const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-// Pre-fill credentials in development for easier testing
-if (isDevelopment) {
-    document.addEventListener('DOMContentLoaded', () => {
-        const emailInput = document.getElementById('email');
-        const passwordInput = document.getElementById('password');
-        
-        if (emailInput && passwordInput) {
-            // Pre-fill with test user credentials in development
-            emailInput.value = 'test@example.com';
-            passwordInput.value = 'Test123!';
-        }
-    });
-}
-
-// Initialize the application
-function init() {
-    // Check if user is already logged in
-    if (authService.isAuthenticated) {
-        redirectToDashboard();
+// Check auth status when app loads
+document.addEventListener('DOMContentLoaded', async () => {
+    // Check if app element exists
+    const appElement = document.getElementById('app');
+    if (!appElement) {
+        console.error('App element not found in the DOM');
         return;
     }
-
-    // Debug: Log button states
-    console.log('Login Form:', loginForm);
-    console.log('Register Link:', registerLink);
-    console.log('Register Button:', registerBtn);
-    console.log('Manager Login Button:', managerLoginBtn);
     
-    // Add event listeners with error handling
-    try {
-        if (loginForm) {
-            loginForm.addEventListener('submit', handleLogin);
-            console.log('Login form event listener added');
-        } else {
-            console.error('Login form not found');
-        }
-
-        if (registerLink) {
-            registerLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                if (registerModal) {
-                    registerModal.show();
-                    console.log('Registration modal shown');
-                } else {
-                    console.error('Register modal not found');
-                }
-            });
-            console.log('Register link event listener added');
-        } else {
-            console.error('Register link not found');
-        }
-
-        if (registerBtn) {
-            registerBtn.addEventListener('click', handleRegister);
-            console.log('Register button event listener added');
-        } else {
-            console.error('Register button not found');
-        }
-
-        if (managerLoginBtn) {
-            managerLoginBtn.addEventListener('click', handleManagerLogin);
-            console.log('Manager login button event listener added');
-        } else {
-            console.error('Manager login button not found');
-        }
-    } catch (error) {
-        console.error('Error initializing event listeners:', error);
-    }
-
-    // Check for success/error messages in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const message = urlParams.get('message');
-    const messageType = urlParams.get('type');
-    
-    if (message) {
-        new Toast({
-            message,
-            type: messageType || 'info',
-            duration: 5000
-        });
-        
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }
-}
-
-// Handle login form submission
-async function handleLogin(e) {
-    e.preventDefault();
-    
-    const email = document.getElementById('email')?.value.trim();
-    const password = document.getElementById('password')?.value;
-    
-    // Basic validation
-    if (!email || !password) {
-        Toast.error('Please enter both email and password');
-        return;
-    }
+    console.log('DOMContentLoaded event fired');
+    console.log('Checking authentication status...');
     
     try {
-        LoadingOverlay.show('Signing in...');
+        const isAuthenticated = auth.isAuthenticated();
+        console.log('Is authenticated:', isAuthenticated);
         
-        // Attempt login
-        await authService.login(email, password);
-        
-        // Get user profile to determine role
-        const userProfile = await profileService.getUserProfile();
-        
-        // Store user data in auth service
-        authService.setUserProfile(userProfile);
-        
-        // Redirect to appropriate dashboard
-        redirectToDashboard();
-        
-    } catch (error) {
-        console.error('Login failed:', error);
-        let errorMessage = 'Login failed. Please check your credentials and try again.';
-        
-        // More specific error messages based on status code
-        if (error.status === 401) {
-            errorMessage = 'Invalid email or password. Please try again.';
-        } else if (error.status === 403) {
-            errorMessage = 'Your account is not yet approved. Please contact your manager.';
-        } else if (!navigator.onLine) {
-            errorMessage = 'Network error. Please check your internet connection.';
-        }
-        
-        Toast.error(errorMessage);
-    } finally {
-        LoadingOverlay.hide();
-    }
-}
-
-// Handle manager login
-async function handleManagerLogin() {
-    try {
-        LoadingOverlay.show('Signing in as manager...');
-        
-        // In a real app, this would be a proper admin login flow
-        // For demo purposes, we'll just show a message
-        Toast.info('Please use your manager credentials to log in.');
-        
-        // Focus the email field for convenience
-        const emailInput = document.getElementById('email');
-        if (emailInput) {
-            emailInput.focus();
-        }
-    } catch (error) {
-        console.error('Manager login failed:', error);
-        Toast.error('Manager login is not available in this demo.');
-    } finally {
-        LoadingOverlay.hide();
-    }
-}
-
-// Handle registration
-async function handleRegister() {
-    const fullName = document.getElementById('regFullName')?.value.trim();
-    const email = document.getElementById('regEmail')?.value.trim().toLowerCase();
-    const password = document.getElementById('regPassword')?.value;
-    const confirmPassword = document.getElementById('regConfirmPassword')?.value;
-    
-    // Basic validation
-    if (!fullName || !email || !password || !confirmPassword) {
-        Toast.error('Please fill in all fields');
-        return;
-    }
-    
-    if (password !== confirmPassword) {
-        Toast.error('Passwords do not match');
-        return;
-    }
-    
-    if (password.length < 8) {
-        Toast.error('Password must be at least 8 characters long');
-        return;
-    }
-    
-    // Password complexity check
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z\d]).{8,}$/;
-    if (!passwordRegex.test(password)) {
-        Toast.error('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character');
-        return;
-    }
-    
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-        Toast.error('Please enter a valid email address');
-        return;
-    }
-    
-    try {
-        console.log('Starting registration process...');
-        LoadingOverlay.show('Creating your account...');
-        
-        console.log('Attempting to register user:', { email, fullName });
-        
-        // Register the user
-        const response = await authService.register({
-            fullName,
-            email,
-            password,
-            confirmPassword,
-            role: 'Employee' // Default role for new registrations
-        });
-        
-        console.log('Registration response received:', response);
-        
-        if (!response) {
-            throw new Error('No response received from server');
-        }
-        
-        console.log('Registration successful, hiding modal and cleaning up...');
-        
-        // Hide the modal
-        const modal = bootstrap.Modal.getInstance(document.getElementById('registerModal'));
-        if (modal) {
-            modal.hide();
-        }
-        
-        // Clear the form
-        const form = document.getElementById('registerForm');
-        if (form) {
-            form.reset();
-        }
-        
-        // Show success message
-        Toast.success('Registration successful! Redirecting...', 3000);
-        
-        // Small delay to show the success message
-        setTimeout(() => {
-            // Check if user is authenticated
-            if (authService.isAuthenticated) {
-                console.log('User is authenticated, checking role...');
-                console.log('User role:', authService.currentUser?.role);
-                
-                // Redirect based on role
-                if (authService.isManager()) {
-                    console.log('Redirecting to manager dashboard');
-                    window.location.href = '/manager-dashboard.html';
-                } else {
-                    console.log('Redirecting to employee dashboard');
-                    window.location.href = '/employee-dashboard.html';
-                }
-            } else {
-                console.error('User is not authenticated after registration');
-                // If not logged in, redirect to login page with email pre-filled
-                window.location.href = `/login.html?email=${encodeURIComponent(email)}`;
-            }
-        }, 1000);
-        
-    } catch (error) {
-        console.error('Registration failed:', error);
-        
-        let errorMessage = 'Registration failed. Please try again.';
-        
-        // More specific error messages based on status code or error message
-        if (error.status === 400) {
-            errorMessage = error.message || 'Invalid registration data. Please check your inputs.';
-        } else if (error.status === 409 || (error.message && error.message.toLowerCase().includes('already exists'))) {
-            errorMessage = 'An account with this email already exists.';
-        } else if (!navigator.onLine) {
-            errorMessage = 'Network error. Please check your internet connection.';
-        } else if (error.message) {
-            // Use the error message from the server if available
-            errorMessage = error.message;
-            
-            // Clean up common error messages
-            if (errorMessage.includes('Password')) {
-                errorMessage = errorMessage.replace('Validation failed: ', '');
-            }
-        }
-        
-        console.error('Registration error details:', {
-            message: error.message,
-            status: error.status,
-            stack: error.stack
-        });
-        
-        Toast.error(errorMessage, 10000);
-    } finally {
-        LoadingOverlay.hide();
-    }
-}
-
-// Redirect to appropriate dashboard based on user role
-function redirectToDashboard() {
-    try {
-        const userProfile = authService.currentUser;
-        
-        if (!userProfile) {
-            console.warn('No user profile found, redirecting to login');
-            window.location.href = '/';
+        if (!isAuthenticated) {
+            console.log('User not authenticated, redirecting to login');
+            router.navigateTo('/login');
             return;
         }
         
-        // Determine the dashboard based on user role
-        let dashboardUrl = '/';
+        // Get user data from localStorage
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        console.log('User from localStorage:', user);
         
-        if (userProfile.role === 'Manager' || userProfile.role === 'Admin') {
-            dashboardUrl = '/manager-dashboard.html';
-        } else if (userProfile.role === 'Employee') {
-            dashboardUrl = '/employee-dashboard.html';
-        } else {
-            console.warn('Unknown user role, redirecting to login');
-            authService.logout();
-            window.location.href = '/';
-            return;
-        }
-        
-        // Add a small delay to ensure any pending operations complete
-        setTimeout(() => {
-            window.location.href = dashboardUrl;
-        }, 100);
-        
-    } catch (error) {
-        console.error('Error during dashboard redirection:', error);
-        // If there's an error, log out and redirect to login
-        authService.logout();
-        window.location.href = '/';
-    }
-}
-
-// Helper function to handle API errors
-function handleApiError(error) {
-    console.error('API Error:', error);
-    
-    let message = 'An unexpected error occurred. Please try again.';
-    
-    if (error.response) {
-        // Server responded with an error status code
-        const { status, data } = error.response;
-        
-        if (status === 401) {
-            message = 'Your session has expired. Please log in again.';
-            authService.logout();
-            setTimeout(() => window.location.href = '/', 1000);
-        } else if (status === 403) {
-            message = 'You do not have permission to perform this action.';
-        } else if (status === 404) {
-            message = 'The requested resource was not found.';
-        } else if (status === 422) {
-            // Handle validation errors
-            const validationErrors = data?.errors;
-            if (validationErrors) {
-                message = Object.values(validationErrors)
-                    .flat()
-                    .join('\n');
+        // If we don't have a role, try to refresh the user data
+        if (!user.role) {
+            console.log('No role found in user data, refreshing...');
+            try {
+                await auth.init();
+                const updatedUser = JSON.parse(localStorage.getItem('user') || '{}');
+                console.log('Updated user after init:', updatedUser);
+                redirectBasedOnRole(updatedUser);
+            } catch (error) {
+                console.error('Error refreshing user data:', error);
+                router.navigateTo('/login');
             }
-        } else if (status >= 500) {
-            message = 'A server error occurred. Please try again later.';
-        } else if (data?.message) {
-            message = data.message;
+        } else {
+            redirectBasedOnRole(user);
         }
-    } else if (error.request) {
-        // Request was made but no response received
-        message = 'Unable to connect to the server. Please check your internet connection.';
-    } else if (error.message) {
-        // Something happened in setting up the request
-        message = error.message;
+        
+        // Hide loading spinner
+        const loadingElement = document.getElementById('loading');
+        console.log('Loading element:', loadingElement);
+        if (loadingElement) {
+            loadingElement.style.display = 'none';
+            console.log('Loading spinner hidden');
+        }
+    } catch (error) {
+        console.error('Error initializing app:', error);
+        // Fallback to login on error
+        router.navigateTo('/login');
     }
-    
-    return message;
-}
-
-// Initialize the app when the DOM is fully loaded
-console.log('Script loaded, initializing...');
-
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM fully loaded, initializing app...');
-    init();
 });
 
-// Also try to initialize immediately in case DOM is already loaded
-setTimeout(init, 100);
+// Define routes with exact match// Root route
+router.addRoute('/', async () => {
+    console.log('Root route handler called');
+    try {
+        // If not authenticated, redirect to login
+        if (!auth.isAuthenticated()) {
+            console.log('User not authenticated, redirecting to login');
+            router.navigateTo('/login');
+            return;
+        }
+        
+        // Get the most up-to-date user data
+        try {
+            // Force refresh user data from the server
+            console.log('Refreshing user data...');
+            await auth.init();
+            
+            // Get the user from localStorage (should now be updated)
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            console.log('Refreshed user data:', user);
+            
+            // Ensure we have a valid role
+            if (!user.role && !user.Role) {
+                console.error('No role found in user data after refresh');
+                throw new Error('No role found in user data');
+            }
+            
+            // Redirect based on role
+            redirectBasedOnRole(user);
+            
+        } catch (refreshError) {
+            console.error('Error refreshing user data:', refreshError);
+            // Fall back to existing localStorage data
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            console.log('Using existing user data:', user);
+            redirectBasedOnRole(user);
+        }
+        
+    } catch (error) {
+        console.error('Error in root route handler:', error);
+        // Clear potentially corrupted auth state
+        auth.logout();
+        router.navigateTo('/login');
+    }
+}, { exact: true });
+
+// Helper function to handle role-based redirection
+function redirectBasedOnRole(user) {
+    console.log('=== redirectBasedOnRole called ===');
+    console.log('Full user object:', JSON.stringify(user, null, 2));
+    
+    if (!user) {
+        console.error('No user object provided to redirectBasedOnRole');
+        router.navigateTo('/login');
+        return;
+    }
+
+    // Normalize the user object to ensure consistent property names
+    const normalizedUser = {
+        ...user,
+        // Handle both 'role' and 'Role' properties
+        role: (user.role || user.Role || '').trim(),
+        // Ensure we have the most complete user data by merging with localStorage
+        ...(JSON.parse(localStorage.getItem('user') || '{}'))
+    };
+
+    console.log('Normalized user object:', JSON.stringify(normalizedUser, null, 2));
+    
+    // Get the role (case-insensitive)
+    const userRole = normalizedUser.role.toLowerCase();
+    console.log('User role:', userRole);
+    
+    if (!userRole) {
+        console.error('No valid role found in user object');
+        router.navigateTo('/login');
+        return;
+    }
+    
+    // Update the stored user data to ensure consistency
+    localStorage.setItem('user', JSON.stringify(normalizedUser));
+    
+    // Check for manager role (case-insensitive)
+    if (userRole === 'manager') {
+        console.log('Role identified as Manager - redirecting to manager dashboard');
+        router.navigateTo('/dashboard/manager');
+    } else {
+        console.log(`Role '${userRole}' is not Manager - redirecting to employee dashboard`);
+        router.navigateTo('/dashboard/employee');
+    }
+}
+
+// Login route
+router.addRoute('/login', async () => {
+    console.log('Login route handler called');
+    try {
+        // If already authenticated, redirect to appropriate dashboard
+        if (auth.isAuthenticated()) {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            console.log('User in login route:', user);
+            redirectBasedOnRole(user);
+            return;
+        }
+        
+        // Show login form
+        await renderLoginView();
+        
+        // Hide loading spinner after login form is rendered
+        const loadingElement = document.getElementById('loading');
+        if (loadingElement) {
+            loadingElement.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error rendering login view:', error);
+    }
+}, { exact: true });
+
+// Dashboard routes
+router.addRoute('/dashboard/employee', async () => {
+    console.log('Employee dashboard route handler called');
+    if (!auth.isAuthenticated()) {
+        router.navigateTo('/login');
+        return;
+    }
+    
+    try {
+        await renderEmployeeDashboard();
+    } catch (error) {
+        console.error('Error rendering employee dashboard:', error);
+        router.navigateTo('/login');
+    }
+}, { exact: true });
+
+router.addRoute('/dashboard/manager', async () => {
+    console.log('Manager dashboard route handler called');
+    if (!auth.isAuthenticated()) {
+        router.navigateTo('/login');
+        return;
+    }
+    
+    try {
+        await renderManagerDashboard();
+    } catch (error) {
+        console.error('Error rendering manager dashboard:', error);
+        router.navigateTo('/login');
+    }
+}, { exact: true });
+
+// Add other dashboard routes
+router.addRoute('/dashboard', () => {
+    // Redirect to appropriate dashboard based on role
+    if (auth.isAuthenticated()) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user.role === 'Manager') {
+            router.navigateTo('/dashboard/manager');
+        } else {
+            router.navigateTo('/dashboard/employee');
+        }
+    } else {
+        router.navigateTo('/login');
+    }
+});
+
+// Add catch-all route for other dashboard paths
+router.addRoute('/dashboard/*', () => {
+    console.log('Catch-all dashboard route handler called');
+    if (!auth.isAuthenticated()) {
+        router.navigateTo('/login');
+        return;
+    }
+    
+    // Extract the remaining path after /dashboard/
+    const path = window.location.pathname;
+    const remainingPath = path.replace(/^\/dashboard\//, '');
+    
+    // If it's a known sub-route, navigate there, otherwise redirect to appropriate dashboard
+    if (remainingPath && remainingPath !== '') {
+        router.navigateTo(`/dashboard/${remainingPath}`);
+    } else {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user.role === 'Manager') {
+            router.navigateTo('/dashboard/manager');
+        } else {
+            router.navigateTo('/dashboard/employee');
+        }
+    }
+});
+
+// Profile route
+router.addRoute('/dashboard/profile', async () => {
+    console.log('Profile route handler called');
+    if (!auth.isAuthenticated()) {
+        router.navigateTo('/login');
+        return;
+    }
+    
+    try {
+        const app = document.getElementById('app');
+        app.innerHTML = `
+            <div class="container mt-4">
+                <h2>User Profile</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-4">
+                            <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 60px; height: 60px; font-size: 24px;">
+                                ${auth.currentUser?.email?.charAt(0).toUpperCase() || 'U'}
+                            </div>
+                            <div>
+                                <h4 class="mb-0">${auth.currentUser?.email || 'User'}</h4>
+                                <p class="text-muted mb-0">${auth.isManager() ? 'Manager' : 'Employee'}</p>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <h5>Account Information</h5>
+                            <p class="mb-1"><strong>Email:</strong> ${auth.currentUser?.email || 'N/A'}</p>
+                            <p class="mb-1"><strong>Role:</strong> ${auth.isManager() ? 'Manager' : 'Employee'}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error rendering profile page:', error);
+        router.navigateTo('/dashboard');
+    }
+});
+
+// Work Items route
+router.addRoute('/dashboard/workitems', async () => {
+    console.log('Work Items route handler called');
+    if (!auth.isAuthenticated()) {
+        router.navigateTo('/login');
+        return;
+    }
+    
+    try {
+        const app = document.getElementById('app');
+        app.innerHTML = `
+            <div class="container mt-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>My Work Items</h2>
+                    <button class="btn btn-primary" id="createWorkItemBtn">
+                        <i class="bi bi-plus-lg me-1"></i> New Work Item
+                    </button>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Project</th>
+                                        <th>Status</th>
+                                        <th>Priority</th>
+                                        <th>Due Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="workItemsList">
+                                    <tr>
+                                        <td colspan="6" class="text-center">Loading work items...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Here you would typically load work items from the API
+        // For now, we'll just show a message
+        setTimeout(() => {
+            const workItemsList = document.getElementById('workItemsList');
+            if (workItemsList) {
+                workItemsList.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center">No work items found.</td>
+                    </tr>
+                `;
+            }
+        }, 500);
+        
+    } catch (error) {
+        console.error('Error rendering work items page:', error);
+        router.navigateTo('/dashboard');
+    }
+});
+
+// Projects route (for managers)
+router.addRoute('/dashboard/projects', async () => {
+    console.log('Projects route handler called');
+    if (!auth.isAuthenticated() || !auth.isManager()) {
+        router.navigateTo('/dashboard');
+        return;
+    }
+    
+    try {
+        const app = document.getElementById('app');
+        app.innerHTML = `
+            <div class="container mt-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>Projects</h2>
+                    <button class="btn btn-primary" id="createProjectBtn">
+                        <i class="bi bi-plus-lg me-1"></i> New Project
+                    </button>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th>Status</th>
+                                        <th>Due Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="projectsList">
+                                    <tr>
+                                        <td colspan="5" class="text-center">Loading projects...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Here you would typically load projects from the API
+        // For now, we'll just show a message
+        setTimeout(() => {
+            const projectsList = document.getElementById('projectsList');
+            if (projectsList) {
+                projectsList.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center">No projects found.</td>
+                    </tr>
+                `;
+            }
+        }, 500);
+        
+    } catch (error) {
+        console.error('Error rendering projects page:', error);
+        router.navigateTo('/dashboard');
+    }
+});
+
+// Add a catch-all route for 404
+router.addRoute('*', () => {
+    console.log('No matching route found, redirecting to dashboard');
+    router.navigateTo('/dashboard');
+});
+
+// Handle back/forward browser buttons
+window.addEventListener('popstate', () => {
+    router.handleRouteChange();
+});
+
+// Handle initial route
+router.handleRouteChange();

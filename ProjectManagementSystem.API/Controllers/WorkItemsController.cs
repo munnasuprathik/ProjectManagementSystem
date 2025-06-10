@@ -19,7 +19,6 @@ namespace ProjectManagementSystem.API.Controllers
         private readonly ApplicationDbContext _context;
         private readonly IWorkloadService _workloadService;
         private readonly IPerformanceService _performanceService;
-        private readonly IEmailService _emailService;
         private readonly UserManager<User> _userManager;
         private readonly ILogger<WorkItemsController> _logger;
 
@@ -27,40 +26,81 @@ namespace ProjectManagementSystem.API.Controllers
             ApplicationDbContext context,
             IWorkloadService workloadService,
             IPerformanceService performanceService,
-            IEmailService emailService,
             UserManager<User> userManager,
             ILogger<WorkItemsController> logger)
         {
             _context = context;
             _workloadService = workloadService;
             _performanceService = performanceService;
-            _emailService = emailService;
             _userManager = userManager;
             _logger = logger;
         }
 
         // GET: api/WorkItems
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<WorkItemDto>>> GetWorkItems()
+        public async Task<ActionResult<IEnumerable<WorkItemDto>>> GetWorkItems([FromQuery] int? projectId = null)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
 
+            _logger.LogInformation($"GetWorkItems called with projectId: {projectId}, User: {userId}, Role: {userRole}");
+            _logger.LogInformation($"Request query string: {Request.QueryString}");
+
+            // Start with base query
             IQueryable<WorkItem> query = _context.WorkItems
                 .Include(wi => wi.Project)
                 .Include(wi => wi.AssignedTo)
                 .Include(wi => wi.CreatedBy);
 
+            // Apply project filter first if projectId is provided and valid
+            if (projectId.HasValue && projectId > 0)
+            {
+                _logger.LogInformation($"Applying project filter for project ID: {projectId}");
+                query = query.Where(wi => wi.ProjectId == projectId.Value);
+                
+                // Log the filtered count
+                var filteredCount = await query.CountAsync();
+                _logger.LogInformation($"Found {filteredCount} work items for project {projectId} after project filter");
+            }
+            else
+            {
+                _logger.LogInformation("No valid project ID provided, project filter not applied");
+            }
+
+            // Apply role-based filtering
+            if (userRole == "Employee")
+            {
+                _logger.LogInformation($"Applying employee filter for user ID: {userId}");
+                query = query.Where(wi => wi.AssignedToId == userId);
+                
+                // Log the final count after all filters
+                var finalCount = await query.CountAsync();
+                _logger.LogInformation($"Found {finalCount} work items after all filters");
+            }
+            else
+            {
+                _logger.LogInformation("User is a manager, no additional filters applied");
+            }
+
             // Employees can only see their own work items
             if (userRole == "Employee")
             {
+                _logger.LogInformation($"Filtering work items for employee: {userId}");
                 query = query.Where(wi => wi.AssignedToId == userId);
             }
-            // Managers can see all work items
+            else
+            {
+                _logger.LogInformation("User is a manager, showing all work items");
+            }
+
+            var sql = query.ToQueryString();
+            _logger.LogInformation($"Generated SQL query: {sql}");
 
             var workItemsQuery = await query
                 .OrderByDescending(wi => wi.CreatedAt)
                 .ToListAsync();
+                
+            _logger.LogInformation($"Found {workItemsQuery.Count} work items matching the criteria");
 
             var workItems = workItemsQuery.Select(wi => new WorkItemDto
             {
@@ -71,6 +111,7 @@ namespace ProjectManagementSystem.API.Controllers
                 Status = wi.Status,
                 CreatedAt = wi.CreatedAt,
                 UpdatedAt = wi.UpdatedAt,
+                Deadline = wi.Deadline != DateTime.MinValue ? wi.Deadline : (DateTime?)null,
                 ProjectId = wi.ProjectId,
                 ProjectName = wi.Project?.ProjectName ?? string.Empty,
                 AssignedToId = wi.AssignedToId ?? string.Empty,
@@ -216,26 +257,6 @@ namespace ProjectManagementSystem.API.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            // Send notification
-            try
-            {
-                if (!string.IsNullOrEmpty(assignedTo.Email))
-                {
-                    await _emailService.SendWorkItemAssignedEmailAsync(
-                        toEmail: assignedTo.Email,
-                        employeeName: assignedTo.UserName ?? "Employee",
-                        workItemName: workItem.WorkItemName,
-                        projectName: project.ProjectName,
-                        priority: workItem.Priority
-                    );
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send work item assignment email");
-                // Continue even if email fails
-            }
-
             return CreatedAtAction(nameof(GetWorkItem), new { id = workItem.WorkItemId }, MapToDto(workItem));
         }
 
@@ -281,12 +302,12 @@ namespace ProjectManagementSystem.API.Controllers
             }
 
             // Update performance metrics based on status change
-            if (statusDto.Status == "Done" || (statusDto.Status == "InProgress" && oldStatus == "Review"))
+            if (statusDto.Status == "Done" || (statusDto.Status == "InProgress" && oldStatus == "Review") || statusDto.Status == "Rejected")
             {
                 var isAccepted = statusDto.Status == "Done";
-                if (!string.IsNullOrEmpty(workItem.AssignedToId))
+                if (workItem.AssignedTo?.Profile != null)
                 {
-                    await UpdatePerformanceMetrics(workItem.AssignedToId, isAccepted);
+                    workItem.AssignedTo.Profile.UpdatePerformance(isAccepted);
                 }
             }
 
@@ -297,88 +318,22 @@ namespace ProjectManagementSystem.API.Controllers
                 (oldStatus == "Done" || statusDto.Status == "Done" || 
                  oldStatus == "Rejected" || statusDto.Status == "Rejected"))
             {
-                if (!string.IsNullOrEmpty(workItem.AssignedToId))
+                if (workItem.AssignedTo?.Profile != null)
                 {
-                    await UpdateWorkload(workItem.AssignedToId);
+                    var activeWorkItems = await _context.WorkItems
+                        .CountAsync(wi => wi.AssignedToId == workItem.AssignedToId && 
+                                       wi.Status != "Done" && 
+                                       wi.Status != "Rejected");
+                    workItem.AssignedTo.Profile.UpdateWorkload(activeWorkItems);
                 }
             }
 
-            // Send notification to assignee
-            try
-            {
-                if (workItem.AssignedTo != null && !string.IsNullOrEmpty(workItem.AssignedTo.Email))
-                {
-                    await _emailService.SendWorkItemStatusUpdateEmailAsync(
-                        toEmail: workItem.AssignedTo.Email,
-                        employeeName: workItem.AssignedTo.UserName ?? "Employee",
-                        workItemName: workItem.WorkItemName,
-                        projectName: workItem.Project?.ProjectName ?? "Unknown Project",
-                        oldStatus: oldStatus,
-                        newStatus: statusDto.Status,
-                        comments: statusDto.Comments
-                    );
-                }
-
-                // If status is being set to Review, notify the manager
-                if (statusDto.Status == "Review" && workItem.CreatedBy != null && !string.IsNullOrEmpty(workItem.CreatedBy.Email))
-                {
-                    await _emailService.SendWorkItemReviewEmailAsync(
-                        toEmail: workItem.CreatedBy.Email,
-                        employeeName: workItem.CreatedBy.UserName ?? "Manager",
-                        workItemName: workItem.WorkItemName,
-                        projectName: workItem.Project?.ProjectName ?? "Unknown Project"
-                    );
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send status update email");
-                // Continue even if email fails
-            }
+            // Email notifications have been removed as per user request
 
             return NoContent();
         }
 
-        private async Task UpdateWorkload(string userId)
-        {
-            var profile = await _context.UserProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
-            if (profile == null) return;
-
-            var activeWorkItems = await _context.WorkItems
-                .CountAsync(wi => wi.AssignedToId == userId && 
-                               wi.Status != "Done" && 
-                               wi.Status != "Rejected");
-
-            profile.CurrentWorkload = activeWorkItems * 10; // 10% per work item
-            profile.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-        }
-
-        private async Task UpdatePerformanceMetrics(string userId, bool isAccepted)
-        {
-            var profile = await _context.UserProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
-            if (profile == null) return;
-
-            if (isAccepted)
-            {
-                // +5% for every 2 accepted items
-                profile.AcceptedItemsCount++;
-                if (profile.AcceptedItemsCount % 2 == 0)
-                {
-                    profile.Performance = Math.Min(100, profile.Performance + 5);
-                }
-            }
-            else
-            {
-                // -5% for rejection
-                profile.Performance = Math.Max(0, profile.Performance - 5);
-                // Reset accepted items counter on rejection
-                profile.AcceptedItemsCount = 0;
-            }
-            
-            profile.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-        }
+        // Performance and workload update methods moved to UserProfile model
 
         private WorkItemDto MapToDto(WorkItem workItem)
         {

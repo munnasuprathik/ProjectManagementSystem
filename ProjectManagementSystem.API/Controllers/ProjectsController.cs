@@ -29,6 +29,7 @@ namespace ProjectManagementSystem.API.Controllers
         {
             var projects = await _context.Projects
                 .Include(p => p.CreatedBy)
+                .Include(p => p.WorkItems)
                 .OrderByDescending(p => p.CreatedAt)
                 .Select(p => new ProjectDto
                 {
@@ -41,7 +42,8 @@ namespace ProjectManagementSystem.API.Controllers
                     Priority = p.Priority ?? "Medium",
                     Status = p.Status ?? "Active",
                     CreatedAt = p.CreatedAt,
-                    CreatedBy = p.CreatedBy.UserName ?? "Unknown"
+                    CreatedBy = p.CreatedBy.UserName ?? "Unknown",
+                    TotalWorkItems = p.WorkItems.Count
                 })
                 .ToListAsync();
 
@@ -199,6 +201,7 @@ namespace ProjectManagementSystem.API.Controllers
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public required string CreatedBy { get; set; }
+        public int TotalWorkItems { get; set; }
     }
 
     public class CreateProjectDto

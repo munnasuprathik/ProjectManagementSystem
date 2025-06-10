@@ -32,5 +32,34 @@ namespace ProjectManagementSystem.API.Models
         
         // Navigation property
         public virtual required User User { get; set; } = null!;
+
+        // Performance calculation methods
+        public void UpdatePerformance(bool isAccepted)
+        {
+            if (isAccepted)
+            {
+                // +5% for every 2 accepted items
+                AcceptedItemsCount++;
+                if (AcceptedItemsCount % 2 == 0)
+                {
+                    Performance = Math.Min(100, Performance + 5);
+                }
+            }
+            else
+            {
+                // -5% for rejection
+                Performance = Math.Max(0, Performance - 5);
+                // Reset accepted items counter on rejection
+                AcceptedItemsCount = 0;
+            }
+            
+            UpdatedAt = DateTime.UtcNow;
+        }
+
+        public void UpdateWorkload(int activeWorkItemsCount)
+        {
+            CurrentWorkload = Math.Min(100, activeWorkItemsCount * 10); // 10% per work item, max 100%
+            UpdatedAt = DateTime.UtcNow;
+        }
     }
 }
