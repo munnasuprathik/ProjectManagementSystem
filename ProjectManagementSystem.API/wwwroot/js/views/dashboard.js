@@ -19,12 +19,25 @@ import { renderProjectsList } from './projects.js';
 // Initialize dashboard based on user role
 async function initializeDashboard() {
     try {
-        await auth.init();
-        const currentUser = auth.currentUser;
+        const isAuthenticated = await auth.init();
         
-        if (!currentUser) {
-            window.location.href = '/login.html';
+        // If we're on login page, don't proceed with dashboard initialization
+        if (window.location.pathname === '/login' || window.location.pathname === '/login.html') {
             return;
+        }
+
+        if (!isAuthenticated) {
+            // Store current URL for redirecting back after login
+            if (window.location.pathname !== '/login' && window.location.pathname !== '/login.html') {
+                sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
+            }
+            window.location.replace('/login');
+            return;
+        }
+        
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+            throw new Error('User not found after authentication');
         }
         
         if (currentUser.role === 'Manager') {
@@ -38,6 +51,11 @@ async function initializeDashboard() {
     } catch (error) {
         console.error('Error initializing dashboard:', error);
         showToast('Failed to load dashboard. Please try again.', 'error');
+        
+        // Only redirect if not already on login page
+        if (!window.location.pathname.includes('login')) {
+            window.location.replace('/login');
+        }
     }
 }
 
@@ -1584,7 +1602,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Check authentication
         const auth = await Auth.getInstance();
         if (!auth.currentUser) {
-            window.location.href = '/login.html';
+            window.location.href = '/login';
             return;
         }
 
