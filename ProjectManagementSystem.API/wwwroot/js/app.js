@@ -158,24 +158,35 @@ function redirectBasedOnRole(user) {
 router.addRoute('/login', async () => {
     console.log('Login route handler called');
     try {
-        // If already authenticated, redirect to appropriate dashboard
-        if (auth.isAuthenticated()) {
+        // Only check authentication if we're not already on the login page
+        if (window.location.pathname !== '/login' && auth.isAuthenticated()) {
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             console.log('User in login route:', user);
             redirectBasedOnRole(user);
             return;
         }
         
+        // Clear any existing content
+        const appElement = document.getElementById('app');
+        if (appElement) {
+            appElement.innerHTML = '';
+        }
+        
         // Show login form
         await renderLoginView();
         
-        // Hide loading spinner after login form is rendered
+        // Ensure loading spinner is hidden
         const loadingElement = document.getElementById('loading');
         if (loadingElement) {
             loadingElement.style.display = 'none';
         }
     } catch (error) {
         console.error('Error rendering login view:', error);
+        // Show error in the app element
+        const appElement = document.getElementById('app');
+        if (appElement) {
+            appElement.innerHTML = '<div class="alert alert-danger">Error loading login page. Please try refreshing.</div>';
+        }
     }
 }, { exact: true });
 

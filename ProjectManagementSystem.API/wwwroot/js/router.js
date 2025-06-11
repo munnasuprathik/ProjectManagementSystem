@@ -6,6 +6,8 @@ class Router {
         this.currentRoute = null;
         this.authRequired = [];
         this.managerOnly = [];
+        this.isNavigating = false;  // Add navigation lock
+        this.navigationTimeout = null;  // Add timeout for debouncing
         this.initEventListeners();
     }
 
@@ -64,25 +66,36 @@ class Router {
     }
 
     async handleRouteChange() {
-        const path = window.location.pathname;
-        console.log('Handling route change to:', path);
-        
+        // Prevent multiple simultaneous route changes
+        if (this.isNavigating) {
+            console.log('Navigation already in progress, skipping...');
+            return;
+        }
+
+        // Clear any existing timeout
+        if (this.navigationTimeout) {
+            clearTimeout(this.navigationTimeout);
+        }
+
+        // Set navigation lock
+        this.isNavigating = true;
+
         try {
-            console.log('All registered routes:', this.routes);
+            const path = window.location.pathname;
+            console.log('Handling route change to:', path);
+            
             const appElement = document.getElementById('app');
             if (!appElement) {
                 console.error('App element not found in the DOM');
                 return;
             }
-            const route = this.findMatchingRoute(path);
 
-            // Store the current path for potential redirects
+            const route = this.findMatchingRoute(path);
             const currentPath = window.location.pathname;
 
             // Check authentication
             if (route?.authRequired && !auth.isAuthenticated()) {
                 console.log('Route requires authentication, redirecting to login...');
-                // Store the intended URL for redirect after login
                 if (currentPath !== '/login') {
                     sessionStorage.setItem('redirectAfterLogin', currentPath);
                 }
@@ -114,6 +127,11 @@ class Router {
         } catch (error) {
             console.error('Error in handleRouteChange:', error);
             window.location.href = '/error';
+        } finally {
+            // Clear navigation lock after a short delay to prevent rapid re-navigation
+            this.navigationTimeout = setTimeout(() => {
+                this.isNavigating = false;
+            }, 100);
         }
     }
 
@@ -142,8 +160,16 @@ class Router {
 
     navigateTo(path, data = {}) {
         console.log('Navigating to:', path, 'with data:', data);
+        
+        // Prevent navigation to current path
         if (path === window.location.pathname) {
             console.log('Already at path:', path);
+            return;
+        }
+
+        // Prevent navigation if already navigating
+        if (this.isNavigating) {
+            console.log('Navigation already in progress, skipping...');
             return;
         }
 
