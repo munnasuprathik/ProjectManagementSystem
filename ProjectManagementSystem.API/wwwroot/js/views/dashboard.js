@@ -585,21 +585,25 @@ function renderWorkItemsByStatus(workItemsByStatus, containerId) {
     
     container.innerHTML = `
         <div class="row g-4">
-            ${workItemsByStatus.map(item => `
+            ${workItemsByStatus.map(item => {
+                // Handle both PascalCase and camelCase property names
+                const status = item.Status || item.status;
+                const count = item.Count || item.count;
+                return `
                 <div class="col-md-3">
-                    <div class="card h-100 border-start border-4 border-${getStatusColor(item.status)}">
+                    <div class="card h-100 border-start border-4 border-${getStatusColor(status)}">
                         <div class="card-body text-center">
-                            <h2 class="mb-1">${item.count}</h2>
-                            <p class="text-muted mb-0">${item.status}</p>
+                            <h2 class="mb-1">${count}</h2>
+                            <p class="text-muted mb-0">${status}</p>
                         </div>
                         <div class="card-footer bg-transparent border-0 pt-0">
-                            <a href="workitems.html?status=${item.status.toLowerCase()}" class="btn btn-sm btn-outline-${getStatusColor(item.status)} w-100">
+                            <a href="workitems.html?status=${status.toLowerCase()}" class="btn btn-sm btn-outline-${getStatusColor(status)} w-100">
                                 View All <i class="bi bi-arrow-right ms-1"></i>
                             </a>
                         </div>
                     </div>
-                </div>
-            `).join('')}
+                </div>`;
+            }).join('')}
         </div>
     `;
 }
@@ -1607,58 +1611,196 @@ export async function renderEmployeeDashboard() {
     try {
         showLoading(true);
         
-        // Ensure all required DOM elements exist
-        if (!ensureDashboardElements()) {
-            throw new Error('Failed to initialize dashboard elements');
+        // Ensure we have a container to render into
+        const appContainer = document.getElementById('app');
+        if (!appContainer) {
+            throw new Error('App container not found');
         }
+
+        // Clear any existing content and show loading state
+        appContainer.innerHTML = `
+            <div class="container-fluid py-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center mb-4">
+                    <h1 id="dashboardTitle" class="h2 mb-0">My Dashboard</h1>
+                    <div id="welcomeMessage"></div>
+                </div>
+                
+                <!-- Work Items by Status -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Work Items by Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="workItemsByStatusChart" class="row g-4"></div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <!-- Recent Work Items -->
+                    <div class="col-lg-8 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Recent Work Items</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="recentWorkItemsTable"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Upcoming Deadlines -->
+                    <div class="col-lg-4 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <h5 class="mb-0">Upcoming Deadlines</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="upcomingDeadlinesList"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- All Work Items -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div id="allWorkItemsContainer"></div>
+                    </div>
+                </div>
+            </div>
+        `;
         
+        // Load dashboard data
         const dashboardData = await api.getEmployeeDashboard();
+        console.log('Dashboard API Response:', dashboardData);
         
         // Update dashboard header
         const welcomeMessage = document.getElementById('welcomeMessage');
-        const dashboardTitle = document.getElementById('dashboardTitle');
-        
-        if (welcomeMessage && dashboardTitle) {
-            dashboardTitle.textContent = 'My Dashboard';
+        if (welcomeMessage) {
             welcomeMessage.innerHTML = `
                 <div class="d-flex align-items-center">
                     <div class="me-3">
-                        <span class="badge bg-primary me-2">Performance: ${formatPerformance(dashboardData.performance || 0)}</span>
-                        <span class="badge bg-secondary">Workload: ${formatWorkload(dashboardData.workload || 0)}</span>
+                        <span class="badge bg-primary me-2">Performance: ${formatPerformance(dashboardData.Performance || 0)}</span>
+                        <span class="badge bg-secondary">Workload: ${formatWorkload(dashboardData.Workload || 0)}</span>
                     </div>
-                </div>
-            `;
+                </div>`;
         }
-        
+
         // Render work items by status
-        renderWorkItemsByStatus(dashboardData.workItemsByStatus, 'workItemsByStatus');
-        
+        if (dashboardData.WorkItemsByStatus?.length > 0) {
+            renderWorkItemsByStatus(dashboardData.WorkItemsByStatus, 'workItemsByStatusChart');
+        } else {
+            const container = document.getElementById('workItemsByStatusChart');
+            if (container) container.innerHTML = '<p class="text-muted">No work items found.</p>';
+        }
+
         // Render recent work items
-        renderWorkItemsTable(dashboardData.recentWorkItems, 'recentWorkItemsContainer', false);
+        if (dashboardData.RecentWorkItems?.length > 0) {
+            renderWorkItemsTable(dashboardData.RecentWorkItems, 'recentWorkItemsTable');
+        } else {
+            const container = document.getElementById('recentWorkItemsTable');
+            if (container) container.innerHTML = '<p class="text-muted">No recent work items found.</p>';
+        }
         
         // Render upcoming deadlines
-        renderUpcomingDeadlines(dashboardData.upcomingDeadlines, 'upcomingDeadlines');
-        
-        // Initialize performance chart if data exists
-        if (dashboardData.performanceHistory?.length > 0) {
-            const ctx = document.getElementById('performanceChart')?.getContext('2d');
-            if (ctx) {
-                createLineChart(ctx, {
-                    labels: dashboardData.performanceHistory.map(item => formatDate(item.date)),
-                    data: dashboardData.performanceHistory.map(item => item.value),
-                    label: 'Performance Trend',
-                    borderColor: '#0d6efd',
-                    backgroundColor: 'rgba(13, 110, 253, 0.1)'
-                });
-            }
+        if (dashboardData.UpcomingDeadlines?.length > 0) {
+            renderUpcomingDeadlines(dashboardData.UpcomingDeadlines, 'upcomingDeadlinesList');
+        } else {
+            const container = document.getElementById('upcomingDeadlinesList');
+            if (container) container.innerHTML = '<p class="text-muted">No upcoming deadlines.</p>';
         }
         
-        // Show dashboard content
-        document.getElementById('dashboardContent')?.classList.remove('d-none');
+        // Load all work items
+        await loadEmployeeWorkItems();
+        
+        // Initialize tooltips
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.forEach(tooltipTriggerEl => {
+            new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+        
     } catch (error) {
         console.error('Error loading employee dashboard:', error);
         showToast('Failed to load dashboard data', 'error');
+        
+        const mainContent = document.getElementById('mainContent');
+        if (mainContent) {
+            mainContent.innerHTML = `
+                <div class="alert alert-danger">
+                    <h4 class="alert-heading">Error Loading Dashboard</h4>
+                    <p>There was an error loading the dashboard. Please try again later.</p>
+                    <hr>
+                    <p class="mb-0">${error.message || 'Unknown error occurred'}</p>
+                </div>`;
+        }
     } finally {
         showLoading(false);
+    }
+    
+    // Function to load employee work items
+    async function loadEmployeeWorkItems() {
+        try {
+            const container = document.getElementById('allWorkItemsContainer');
+            if (!container) return;
+            
+            // Show loading state
+            container.innerHTML = `
+                <div class="d-flex justify-content-center my-4">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>`;
+            
+            const workItems = await api.getWorkItems({ assignedTo: 'me' });
+            console.log('Fetched work items:', workItems);
+            
+            // Update the container with work items
+            container.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>My Work Items</h3>
+                    <button class="btn btn-primary btn-sm" id="refreshWorkItems">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+                <div id="allWorkItemsTable" class="table-responsive"></div>
+            `;
+            
+            // Render the work items table
+            const tableContainer = document.getElementById('allWorkItemsTable');
+            if (workItems?.length > 0) {
+                renderWorkItemsTable(workItems, 'allWorkItemsTable');
+            } else {
+                tableContainer.innerHTML = '<div class="alert alert-info">No work items assigned to you.</div>';
+            }
+            
+            // Add refresh button event listener
+            document.getElementById('refreshWorkItems').addEventListener('click', async () => {
+                try {
+                    const refreshedItems = await api.getWorkItems({ assignedTo: 'me' });
+                    if (refreshedItems?.length > 0) {
+                        renderWorkItemsTable(refreshedItems, 'allWorkItemsTable');
+                        showToast('Work items refreshed successfully', 'success');
+                    } else {
+                        tableContainer.innerHTML = '<div class="alert alert-info">No work items assigned to you.</div>';
+                    }
+                } catch (error) {
+                    console.error('Error refreshing work items:', error);
+                    showToast('Failed to refresh work items', 'error');
+                }
+            });
+            
+        } catch (error) {
+            console.error('Error in loadEmployeeWorkItems:', error);
+            const container = document.getElementById('allWorkItemsContainer');
+            if (container) {
+                container.innerHTML = `
+                    <div class="alert alert-danger">
+                        <h4 class="alert-heading">Error Loading Work Items</h4>
+                        <p>There was an error loading your work items. Please try again later.</p>
+                        <hr>
+                        <p class="mb-0">${error.message || 'Unknown error occurred'}</p>
+                    </div>`;
+            }
+        }
     }
 }

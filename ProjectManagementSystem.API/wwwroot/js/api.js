@@ -59,10 +59,44 @@ class ApiClient {
 
     async getEmployeeDashboard() {
         try {
-            const response = await axios.get(`${this.baseUrl}/api/dashboard/employee`);
-            return response.data;
+            console.log('Fetching employee dashboard from:', `${this.baseUrl}/api/dashboard/employee`);
+            console.log('Current auth token:', this.token ? 'Token exists' : 'No token');
+            
+            const response = await axios.get(`${this.baseUrl}/api/dashboard/employee`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Accept': 'application/json'
+                },
+                validateStatus: function (status) {
+                    return status < 500; // Reject only if the status code is greater than or equal to 500
+                }
+            });
+            
+            console.log('Dashboard API response status:', response.status);
+            console.log('Dashboard API response headers:', response.headers);
+            
+            if (response.status === 200) {
+                console.log('Dashboard data received:', response.data);
+                return response.data;
+            } else {
+                console.error('Dashboard API error:', response.status, response.statusText, response.data);
+                throw new Error(`Failed to fetch dashboard: ${response.status} ${response.statusText}`);
+            }
         } catch (error) {
             console.error('Failed to fetch employee dashboard:', error);
+            if (error.response) {
+                // The request was made and the server responded with a status code
+                // that falls out of the range of 2xx
+                console.error('Error response data:', error.response.data);
+                console.error('Error response status:', error.response.status);
+                console.error('Error response headers:', error.response.headers);
+            } else if (error.request) {
+                // The request was made but no response was received
+                console.error('No response received:', error.request);
+            } else {
+                // Something happened in setting up the request that triggered an Error
+                console.error('Error message:', error.message);
+            }
             throw error;
         }
     }
