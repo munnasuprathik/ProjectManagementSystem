@@ -323,6 +323,7 @@ namespace ProjectManagementSystem.API.Controllers
                                        wi.Status != "Done" && 
                                        wi.Status != "Rejected");
                     workItem.AssignedTo.Profile.UpdateWorkload(activeWorkItems);
+                    await _context.SaveChangesAsync();
                 }
             }
 

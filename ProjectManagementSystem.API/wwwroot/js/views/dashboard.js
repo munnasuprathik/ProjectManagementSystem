@@ -72,9 +72,7 @@ function ensureDashboardElements() {
                     <h1 id="dashboardTitle" class="h3 mb-0">Dashboard</h1>
                     <div class="d-flex align-items-center">
                         <div id="welcomeMessage" class="me-3"></div>
-                        <button id="createProjectBtn" class="btn btn-primary">
-                            <i class="bi bi-plus-circle me-1"></i> Create Project
-                        </button>
+                        
                     </div>
                 </div>
                 
