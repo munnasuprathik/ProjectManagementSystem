@@ -81,9 +81,8 @@ function ensureDashboardElements() {
                 
                 <!-- Projects Table -->
                 <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card-header">
                         <h5 class="card-title mb-0">Projects</h5>
-                        <a href="/projects" class="btn btn-sm btn-outline-primary">View All Projects</a>
                     </div>
                     <div class="card-body">
                         <div id="projectsContainer">
@@ -96,29 +95,7 @@ function ensureDashboardElements() {
                     </div>
                 </div>
                 
-                <!-- Charts Row -->
-                <div class="row mb-4">
-                    <div class="col-md-6 mb-4 mb-md-0">
-                        <div class="card h-100">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0">Work Items by Status</h5>
-                            </div>
-                            <div class="card-body">
-                                <canvas id="workItemsByStatusChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card h-100">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0">Projects by Status</h5>
-                            </div>
-                            <div class="card-body">
-                                <canvas id="projectsByStatusChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+
                 
                 <!-- Recent Work Items -->
                 <div class="card mb-4">
@@ -596,32 +573,77 @@ function renderProjectStats(dashboardData) {
 
 // Render work items by status for employee dashboard
 function renderWorkItemsByStatus(workItemsByStatus, containerId) {
-    const container = document.getElementById(containerId);
-    if (!container || !workItemsByStatus) return;
+    console.log('=== renderWorkItemsByStatus called ===');
+    console.log('Container ID:', containerId);
+    console.log('Work items data type:', typeof workItemsByStatus);
+    console.log('Work items is array?:', Array.isArray(workItemsByStatus));
+    console.log('Work items length:', workItemsByStatus?.length || 0);
     
-    container.innerHTML = `
-        <div class="row g-4">
-            ${workItemsByStatus.map(item => {
-                // Handle both PascalCase and camelCase property names
-                const status = item.Status || item.status;
-                const count = item.Count || item.count;
-                return `
-                <div class="col-md-3">
-                    <div class="card h-100 border-start border-4 border-${getStatusColor(status)}">
-                        <div class="card-body text-center">
-                            <h2 class="mb-1">${count}</h2>
-                            <p class="text-muted mb-0">${status}</p>
+    // Log the first item's structure if available
+    if (workItemsByStatus && workItemsByStatus.length > 0) {
+        console.log('First work item structure:', JSON.parse(JSON.stringify(workItemsByStatus[0])));
+    }
+    
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.error('Container not found:', containerId);
+        return;
+    }
+    
+    if (!workItemsByStatus || workItemsByStatus.length === 0) {
+        const message = 'No work items data available';
+        console.log(message);
+        container.innerHTML = `<p class="text-muted">${message}</p>`;
+        return;
+    }
+    
+    try {
+        // Handle different data formats and ensure we have an array
+        const items = Array.isArray(workItemsByStatus) ? workItemsByStatus : [workItemsByStatus];
+        
+        // Process each status item
+        const statusItems = items.map(item => ({
+            status: item.Status || item.status || 'Unknown',
+            count: item.Count || item.count || 0
+        }));
+        
+        console.log('Processed status items:', statusItems);
+        
+        container.innerHTML = `
+            <div class="row g-4">
+                ${statusItems.map(item => {
+                    const status = item.status || 'Unknown';
+                    const count = item.count || 0;
+                    const statusColor = getStatusColor(status);
+                    
+                    return `
+                    <div class="col-md-3">
+                        <div class="card h-100 border-start border-4 border-${statusColor}">
+                            <div class="card-body text-center">
+                                <h2 class="mb-1">${count}</h2>
+                                <p class="text-muted mb-0">${status}</p>
+                            </div>
+                            <div class="card-footer bg-transparent border-0 pt-0">
+                                <a href="workitems.html?status=${status.toLowerCase()}" 
+                                   class="btn btn-sm btn-outline-${statusColor} w-100">
+                                    View All <i class="bi bi-arrow-right ms-1"></i>
+                                </a>
+                            </div>
                         </div>
-                        <div class="card-footer bg-transparent border-0 pt-0">
-                            <a href="workitems.html?status=${status.toLowerCase()}" class="btn btn-sm btn-outline-${getStatusColor(status)} w-100">
-                                View All <i class="bi bi-arrow-right ms-1"></i>
-                            </a>
-                        </div>
-                    </div>
-                </div>`;
-            }).join('')}
-        </div>
-    `;
+                    </div>`;
+                }).join('')}
+            </div>
+        `;
+        
+        console.log('Successfully rendered work items by status');
+    } catch (error) {
+        console.error('Error rendering work items by status:', error);
+        container.innerHTML = `
+            <div class="alert alert-danger">
+                Error displaying work items. Please try refreshing the page.
+                ${process.env.NODE_ENV === 'development' ? `<br><small>${error.message}</small>` : ''}
+            </div>`;
+    }
 }
 
 // Helper function to get color for status
@@ -724,7 +746,7 @@ function renderProjectsTable(projects, containerId) {
             '              data-project-id="' + project.ProjectId + '"',
             '              data-project-name="' + escapeHtml(project.ProjectName || 'Project') + '"',
             '              title="View all work items">',
-            '        <i class="bi bi-list-task"></i> View (' + (project.WorkItemCount || 0) + ')',
+            '        <i class="bi bi-list-task"></i> View Work Items',
             '      </button>',
             '      <button class="btn btn-outline-success add-work-item-btn"',
             '              data-project-id="' + project.ProjectId + '"',
@@ -1035,17 +1057,53 @@ function renderUpcomingDeadlines(deadlines, containerId) {
 
 // Initialize charts for manager dashboard
 function initManagerCharts(dashboardData) {
-    console.log('Initializing charts with data:', dashboardData);
+    console.log('=== DEBUG: Dashboard Data Structure ===');
+    console.log('All dashboard data keys:', Object.keys(dashboardData));
+    console.log('WorkItemsByStatus type:', typeof dashboardData.WorkItemsByStatus);
+    console.log('WorkItemsByStatus array length:', dashboardData.WorkItemsByStatus?.length || 0);
+    
+    // Log each item in WorkItemsByStatus with all its properties
     
     // Work Items by Status Pie Chart
-    const workItemsByStatus = dashboardData.WorkItemsByStatus || [];
+    let workItemsByStatus = dashboardData.WorkItemsByStatus || dashboardData.workItemsByStatus || [];
+    console.log('Work items by status raw data:', workItemsByStatus);
+    
+    // If WorkItemsByStatus is empty but workItems is available, try to process it
+    if ((!workItemsByStatus || workItemsByStatus.length === 0) && dashboardData.workItems) {
+        console.log('Processing work items data to generate status counts');
+        // Group work items by status
+        const statusCounts = {};
+        dashboardData.workItems.forEach(item => {
+            // Handle both camelCase and PascalCase property names
+            const status = item.status || item.Status || 'Unknown';
+            if (status) {
+                statusCounts[status] = (statusCounts[status] || 0) + 1;
+            }
+        });
+        
+        // Convert to array format expected by the chart
+        workItemsByStatus = Object.entries(statusCounts).map(([status, count]) => ({
+            status: status.charAt(0).toUpperCase() + status.slice(1), // Capitalize first letter
+            count
+        }));
+        console.log('Processed work items by status:', workItemsByStatus);
+    }
+
     if (workItemsByStatus.length > 0) {
         const statusCtx = document.getElementById('workItemsByStatusChart');
         if (statusCtx) {
             try {
+                // Process status data
+                const statusData = workItemsByStatus.map(item => ({
+                    status: item.status || item.Status || item.key || 'Unknown',
+                    count: item.count || item.value || 0
+                }));
+                
+                console.log('Processed status data:', statusData);
+                
                 createPieChart(statusCtx.getContext('2d'), {
-                    labels: workItemsByStatus.map(item => item.status || 'Unknown'),
-                    data: workItemsByStatus.map(item => item.count || 0),
+                    labels: statusData.map(item => item.status),
+                    data: statusData.map(item => item.count),
                     label: 'Work Items by Status',
                     colors: [
                         '#6c757d', // ToDo - Gray
@@ -1058,40 +1116,85 @@ function initManagerCharts(dashboardData) {
                 console.log('Work items by status chart initialized');
             } catch (error) {
                 console.error('Error initializing work items chart:', error);
+                // Show error message in the UI
+                const chartContainer = statusCtx.closest('.card-body');
+                if (chartContainer) {
+                    chartContainer.innerHTML = '<p class="text-danger">Error loading work items chart</p>';
+                }
             }
         } else {
             console.warn('Work items chart container not found');
         }
     } else {
-        console.log('No work items by status data available');
+        console.warn('No work items by status data available');
+        // Show a message in the UI
+        const chartContainer = document.querySelector('#workItemsByStatusChart')?.closest('.card-body');
+        if (chartContainer) {
+            chartContainer.innerHTML = '<p class="text-muted">No work items data available</p>';
+        }
     }
 
     // Employees by Workload Bar Chart
-    const employeesByWorkload = dashboardData.EmployeesByWorkload || [];
+    const employeesByWorkload = dashboardData.EmployeesByWorkload || 
+                              dashboardData.employeesByWorkload || 
+                              dashboardData.teamMembers || [];
+                              
+    console.log('Employees by workload raw data:', employeesByWorkload);
+    
     if (employeesByWorkload.length > 0) {
         const workloadCtx = document.getElementById('employeesByWorkloadChart');
         if (workloadCtx) {
             try {
-                createBarChart(workloadCtx.getContext('2d'), {
-                    labels: employeesByWorkload.map(item => item.range || 'Unknown'),
-                    data: employeesByWorkload.map(item => item.count || 0),
-                    label: 'Number of Employees',
-                    backgroundColor: [
-                        '#198754', // 0-25% - Green
-                        '#20c997', // 26-50% - Teal
-                        '#ffc107', // 51-75% - Yellow
-                        '#fd7e14'  // 76-100% - Orange
-                    ]
+                // Process employee data to get names and workload
+                const employeeData = employeesByWorkload.map(item => {
+                    // Handle different possible property names
+                    const name = item.name || 
+                               item.employeeName || 
+                               item.fullName || 
+                               (item.firstName && item.lastName ? `${item.firstName} ${item.lastName}` : 'Unknown');
+                                
+                    const workload = item.workload || 
+                                   item.workloadPercentage || 
+                                   item.currentWorkload || 
+                                   (item.performance ? 100 - item.performance : 0);
+                    
+                    return { name, workload: Math.min(100, Math.max(0, workload)) };
                 });
-                console.log('Employees by workload chart initialized');
+
+                // Sort by workload descending
+                employeeData.sort((a, b) => b.workload - a.workload);
+
+                // Limit to top 10 employees if there are many
+                const displayData = employeeData.slice(0, 10);
+                console.log('Processed employee workload data:', displayData);
+
+                createBarChart(workloadCtx.getContext('2d'), {
+                    labels: displayData.map(item => item.name),
+                    data: displayData.map(item => item.workload),
+                    label: 'Workload %',
+                    backgroundColor: Array(displayData.length).fill('#0d6efd'), // Blue bars
+                    borderColor: '#0a58ca',
+                    borderWidth: 1
+                });
+                console.log('Employees by workload chart initialized with data:', displayData);
             } catch (error) {
                 console.error('Error initializing workload chart:', error);
+                // Show error message in the UI
+                const chartContainer = workloadCtx.closest('.card-body');
+                if (chartContainer) {
+                    chartContainer.innerHTML = '<p class="text-danger">Error loading workload chart</p>';
+                }
             }
         } else {
             console.warn('Workload chart container not found');
         }
     } else {
         console.log('No employees by workload data available');
+        // Show a message in the UI
+        const chartContainer = document.querySelector('#employeesByWorkloadChart')?.closest('.card-body');
+        if (chartContainer) {
+            chartContainer.innerHTML = '<p class="text-muted">No workload data available</p>';
+        }
     }
 }
 
@@ -1588,7 +1691,7 @@ function renderWorkItemsList(workItems) {
                     '</div>'
                 ].join('');
             } else {
-                statusControl = '<span class="badge ' + statusColor + '">' + escapeHtml(status) + '</span>';
+                statusControl = '<span class="badge ' + statusColor + ' text-black">' + escapeHtml(status) + '</span>';
             }
             
             // Create the row HTML using string concatenation instead of template literals in array
@@ -1609,11 +1712,7 @@ function renderWorkItemsList(workItems) {
                 '  <td><span class="badge ' + priorityClass + '">' + escapeHtml(priority) + '</span></td>',
                 '  <td>' + escapeHtml(item.AssignedToName || item.AssignedTo || 'Unassigned') + '</td>',
                 '  <td>' + deadline + '</td>',
-                '  <td class="text-end">',
-                '    <a href="/workitems/' + item.WorkItemId + '" class="btn btn-sm btn-outline-primary me-1">',
-                '      <i class="bi bi-eye"></i> View',
-                '    </a>',
-                '  </td>',
+
                 '</tr>'
             ].join('');
         }).join('');
@@ -1628,7 +1727,7 @@ function renderWorkItemsList(workItems) {
         console.error('Error rendering work items:', error);
         container.innerHTML = [
             '<tr>',
-            '  <td colspan="6" class="text-center text-danger">',
+            '  <td colspan="5" class="text-center text-danger">',
             '    Error displaying work items. Please check console for details.',
             '  </td>',
             '</tr>'
@@ -1772,14 +1871,34 @@ export async function renderEmployeeDashboard() {
                 </div>`;
         }
 
+        // Debug: Log the dashboard data structure
+        console.log('=== Employee Dashboard Data ===');
+        console.log('Dashboard data keys:', Object.keys(dashboardData));
+        console.log('WorkItemsByStatus:', dashboardData.WorkItemsByStatus);
+        
+        // Create or update the container for work items status
+        const statusContainerId = 'workItemsStatusContainer';
+        let statusContainer = document.getElementById(statusContainerId);
+        
+        if (!statusContainer) {
+            // Create the container if it doesn't exist
+            const chartContainer = document.getElementById('workItemsByStatusChart');
+            if (chartContainer) {
+                // Create a new container for the status cards
+                chartContainer.insertAdjacentHTML('afterend', `
+                    <div id="${statusContainerId}" class="row g-4 mb-4"></div>
+                `);
+                statusContainer = document.getElementById(statusContainerId);
+            }
+        }
+        
         // Render work items by status
         if (dashboardData.WorkItemsByStatus?.length > 0) {
-            renderWorkItemsByStatus(dashboardData.WorkItemsByStatus, 'workItemsByStatusChart');
-        } else {
-            const container = document.getElementById('workItemsByStatusChart');
-            if (container) container.innerHTML = '<p class="text-muted">No work items found.</p>';
+            renderWorkItemsByStatus(dashboardData.WorkItemsByStatus, statusContainerId);
+        } else if (statusContainer) {
+            statusContainer.innerHTML = '<div class="col-12"><p class="text-muted">No work items found.</p></div>';
         }
-
+        
         // Render recent work items
         if (dashboardData.RecentWorkItems?.length > 0) {
             renderWorkItemsTable(dashboardData.RecentWorkItems, 'recentWorkItemsTable');
