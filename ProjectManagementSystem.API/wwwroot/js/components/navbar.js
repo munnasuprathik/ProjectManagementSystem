@@ -52,7 +52,7 @@ export function renderNavbar() {
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                                 <li>
-                                    <a class="dropdown-item" href="/profile" data-link>
+                                    <a class="dropdown-item" href="/dashboard/profile" data-link>
                                         <i class="bi bi-person me-2"></i> Profile
                                     </a>
                                 </li>

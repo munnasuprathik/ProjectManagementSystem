@@ -463,8 +463,8 @@ namespace ProjectManagementSystem.API.Controllers
     public class UpdateWorkItemStatusDto
     {
         [Required]
-        [RegularExpression("^(ToDo|InProgress|Review|Done)$", 
-            ErrorMessage = "Status must be one of: ToDo, InProgress, Review, Done")]
+        [RegularExpression("^(ToDo|InProgress|Review|Done|Rejected)$", 
+            ErrorMessage = "Status must be one of: ToDo, InProgress, Review, Done, Rejected")]
         public required string Status { get; set; } // "ToDo", "InProgress", "Review", "Done"
         public string? Comments { get; set; } // For rejection reason
     }

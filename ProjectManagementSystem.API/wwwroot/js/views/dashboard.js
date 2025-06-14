@@ -711,7 +711,7 @@ function renderProjectsTable(projects, containerId) {
         const deadline = formatDate(project.Deadline);
         
         return [
-            '<tr>',
+            '<tr data-project-id="' + project.ProjectId + '">',
             '  <td>' + escapeHtml(project.ProjectName) + '</td>',
             '  <td>' + statusBadge + '</td>',
             '  <td>' + priorityBadge + '</td>',
@@ -737,7 +737,14 @@ function renderProjectsTable(projects, containerId) {
             '              data-project-name="' + escapeHtml(project.ProjectName || 'Project') + '"',
             '              title="View tasks set for review">',
             '        <i class="bi bi-eye"></i> Review',
-            '      </button>',
+            '      </button>' +
+            (project.Status?.toLowerCase() === 'active' ? 
+            '      <button class="btn btn-outline-danger close-project-btn"' +
+            '              data-project-id="' + project.ProjectId + '"' +
+            '              data-project-name="' + escapeHtml(project.ProjectName || 'Project') + '"' +
+            '              title="Close Project">' +
+            '        <i class="bi bi-x-circle"></i> Close' +
+            '      </button>' : '') +
             '    </div>',
             '  </td>',
             '</tr>'
@@ -752,6 +759,69 @@ function renderProjectsTable(projects, containerId) {
     ].join('\n');
 
     container.innerHTML = tableHtml;
+    
+    // Add event listeners for Close Project buttons
+    document.querySelectorAll('.close-project-btn').forEach(button => {
+        button.addEventListener('click', handleCloseProject);
+    });
+}
+
+// Handle Close Project button click
+async function handleCloseProject(event) {
+    const button = event.currentTarget;
+    const projectId = button.getAttribute('data-project-id');
+    const projectName = button.getAttribute('data-project-name');
+    
+    if (!projectId) {
+        console.error('Project ID not found');
+        showToast('Error: Project ID not found', 'error');
+        return;
+    }
+    
+    // Confirm before closing
+    if (!confirm(`Are you sure you want to close the project "${projectName}"? This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        // Show loading state
+        button.disabled = true;
+        const originalText = button.innerHTML;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Closing...';
+        
+        // Call API to update project status
+        await api.patch(`/api/Projects/${projectId}/status`, { status: 'Closed' });
+        
+        // Show success message
+        showToast(`Project "${projectName}" has been closed successfully.`, 'success');
+        
+        // Immediately remove the project row from the table
+        const projectRow = button.closest('tr');
+        
+        if (projectRow) {
+            // Remove the row immediately
+            projectRow.remove();
+            
+            // Check if the table is now empty and show appropriate message
+            const tbody = document.querySelector('#projectsTable tbody');
+            if (tbody && tbody.children.length === 0) {
+                const emptyRow = document.createElement('tr');
+                emptyRow.innerHTML = `
+                    <td colspan="7" class="text-center py-4">
+                        No active projects found.
+                    </td>
+                `;
+                tbody.appendChild(emptyRow);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error closing project:', error);
+        const errorMessage = error.response?.data?.message || 'Failed to close project. Please try again.';
+        showToast(errorMessage, 'error');
+        button.disabled = false;
+        button.innerHTML = originalText;
+    }
 }
 
 // Render work items table

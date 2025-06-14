@@ -262,7 +262,7 @@ router.addRoute('/dashboard/*', () => {
 });
 
 // Profile route
-router.addRoute('/dashboard/profile', async () => {
+router.addRoute('/#/dashboard/profile', async () => {
     console.log('Profile route handler called');
     if (!auth.isAuthenticated()) {
         router.navigateTo('/login');

@@ -38,7 +38,12 @@ export async function renderProfile() {
                                 </div>
                                 
                                 <!-- User Info -->
-                                <h4 class="mb-1">${profile.fullName || 'User'}</h4>
+                                <div class="d-flex justify-content-center align-items-center">
+                                    <h4 class="mb-1 me-2">${profile.fullName || 'User'}</h4>
+                                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editProfileModal">
+                                        <i class="bi bi-pencil"></i> Edit Profile
+                                    </button>
+                                </div>
                                 <p class="text-muted mb-3">${profile.role || 'User'}</p>
                                 
                                 <!-- Performance -->

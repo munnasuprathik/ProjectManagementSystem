@@ -102,12 +102,28 @@ class ApiClient {
     }
 
     // Projects endpoints
-    async getProjects() {
+    async get(url, config = {}) {
         try {
-            const response = await axios.get(`${this.baseUrl}/api/projects`);
+            const response = await axios.get(`${this.baseUrl}${url}`, config);
             return response.data;
         } catch (error) {
-            console.error('Failed to fetch projects:', error);
+            console.error(`GET ${url} failed:`, error);
+            throw error;
+        }
+    }
+
+    async patch(url, data = {}, config = {}) {
+        try {
+            const response = await axios.patch(`${this.baseUrl}${url}`, data, {
+                ...config,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(config.headers || {})
+                }
+            });
+            return response.data;
+        } catch (error) {
+            console.error(`PATCH ${url} failed:`, error);
             throw error;
         }
     }

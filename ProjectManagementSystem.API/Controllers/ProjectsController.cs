@@ -25,11 +25,20 @@ namespace ProjectManagementSystem.API.Controllers
 
         // GET: api/Projects
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ProjectDto>>> GetProjects()
+        public async Task<ActionResult<IEnumerable<ProjectDto>>> GetProjects([FromQuery] bool includeClosed = false)
         {
-            var projects = await _context.Projects
+            var query = _context.Projects
                 .Include(p => p.CreatedBy)
                 .Include(p => p.WorkItems)
+                .AsQueryable();
+                
+            // Filter out closed projects by default
+            if (!includeClosed)
+            {
+                query = query.Where(p => p.Status != "Closed");
+            }
+            
+            var projects = await query
                 .OrderByDescending(p => p.CreatedAt)
                 .Select(p => new ProjectDto
                 {
