@@ -128,7 +128,42 @@ function setupWorkItemForm(workItemId = null) {
             
         } catch (error) {
             console.error(`Error ${workItemId ? 'updating' : 'creating'} work item:`, error);
-            showToast(`Failed to ${workItemId ? 'update' : 'create'} work item. Please try again.`, 'error');
+            
+            // Log detailed error information
+            if (error.response) {
+                // The request was made and the server responded with a status code
+                // that falls out of the range of 2xx
+                console.error('Error response data:', error.response.data);
+                console.error('Error status:', error.response.status);
+                console.error('Error headers:', error.response.headers);
+                
+                // Extract and show validation errors if available
+                let errorMessage = `Failed to ${workItemId ? 'update' : 'create'} work item.`;
+                
+                if (error.response.data && error.response.data.errors) {
+                    // Handle validation errors
+                    const validationErrors = Object.values(error.response.data.errors)
+                        .flat()
+                        .join(' ');
+                    errorMessage += ` ${validationErrors}`;
+                } else if (error.response.data && error.response.data.title) {
+                    // Handle problem details format
+                    errorMessage = error.response.data.title;
+                } else if (error.response.data && error.response.data.message) {
+                    // Handle custom error message
+                    errorMessage = error.response.data.message;
+                }
+                
+                showToast(errorMessage, 'error');
+            } else if (error.request) {
+                // The request was made but no response was received
+                console.error('No response received:', error.request);
+                showToast('No response from server. Please check your connection.', 'error');
+            } else {
+                // Something happened in setting up the request that triggered an Error
+                console.error('Error setting up request:', error.message);
+                showToast(`Error: ${error.message}`, 'error');
+            }
         } finally {
             // Reset form and loading state
             submitBtn.disabled = false;

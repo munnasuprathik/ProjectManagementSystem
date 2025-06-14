@@ -491,8 +491,67 @@ class ApiClient {
     }
 
     async createWorkItem(workItemData) {
-        const response = await axios.post(`${this.baseUrl}/api/workitems`, workItemData);
-        return response.data;
+        try {
+            // Ensure required fields are present and properly formatted
+            if (!workItemData.workItemName) {
+                throw new Error('Work item name is required');
+            }
+            if (!workItemData.assignedToId) {
+                throw new Error('Assigned user is required');
+            }
+            if (!workItemData.priority) {
+                throw new Error('Priority is required');
+            }
+            if (!workItemData.projectId) {
+                throw new Error('Project is required');
+            }
+
+            // Format the payload to match the backend DTO
+            const payload = {
+                ProjectId: parseInt(workItemData.projectId, 10),
+                AssignedToId: workItemData.assignedToId,
+                WorkItemName: workItemData.workItemName.trim(),
+                Description: workItemData.description?.trim() || '',
+                Priority: workItemData.priority,
+                Deadline: workItemData.deadline ? new Date(workItemData.deadline).toISOString() : undefined
+            };
+
+            console.log('Sending work item creation request:', JSON.stringify(payload, null, 2));
+            
+            const response = await axios.post(`${this.baseUrl}/api/workitems`, payload, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                withCredentials: true
+            });
+            
+            console.log('Work item created successfully:', response.data);
+            return response.data;
+            
+        } catch (error) {
+            console.error('Error creating work item:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+                config: {
+                    url: error.config?.url,
+                    method: error.config?.method,
+                    data: error.config?.data
+                }
+            });
+            
+            // If we have a response with error details, use that
+            if (error.response && error.response.data) {
+                const serverError = new Error(error.response.data.title || 'Failed to create work item');
+                serverError.response = error.response.data;
+                throw serverError;
+            }
+            
+            // Re-throw the original error if we can't extract more details
+            throw error;
+        }
     }
 
     async updateWorkItemStatus(id, status) {
