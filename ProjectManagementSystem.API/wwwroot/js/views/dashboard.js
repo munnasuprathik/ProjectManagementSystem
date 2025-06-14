@@ -286,7 +286,6 @@ export async function renderManagerDashboard() {
                                         <th>Performance</th>
                                         <th>Workload</th>
                                         <th>Skills</th>
-                                        <th class="text-end">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -348,18 +347,11 @@ export async function renderManagerDashboard() {
                                                         `).join('') || '-'}
                                                     </div>
                                                 </td>
-                                                <td class="text-end">
-                                                    <button class="btn btn-sm btn-outline-primary" title="View Details" data-user-id="${member.userId || member.id || ''}">
-                                                        <i class="bi bi-eye"></i>
-                                                    </button>
-                                                    <button class="btn btn-sm btn-outline-secondary ms-1" title="Send Message" data-user-id="${member.userId || member.id || ''}">
-                                                        <i class="bi bi-envelope"></i>
-                                                    </button>
-                                                </td>
                                             </tr>`;
                                         }).join('')
                                         : `
                                             <tr>
+                                                <td colspan="6" class="text-center py-4">
                                                 <td colspan="7" class="text-center py-4">
                                                     <div class="text-muted">No team members found</div>
                                                 </td>
@@ -1035,6 +1027,14 @@ function renderUpcomingDeadlines(deadlines, containerId) {
                 const daysRemaining = deadline.DaysRemaining || 0;
                 const dueDate = deadline.Deadline || deadline.DueDate;
                 
+                // Format days remaining text
+                let daysText;
+                if (daysRemaining === 0) daysText = 'Today';
+                else if (daysRemaining === 1) daysText = 'Tomorrow';
+                else if (daysRemaining === -1) daysText = 'Yesterday';
+                else if (daysRemaining > 0) daysText = `in ${daysRemaining} days`;
+                else daysText = `${Math.abs(daysRemaining)} days ago`;
+                
                 return `
                 <a href="#" class="list-group-item list-group-item-action" 
                    data-bs-toggle="modal" data-bs-target="#workItemDetailsModal" 
@@ -1042,7 +1042,7 @@ function renderUpcomingDeadlines(deadlines, containerId) {
                     <div class="d-flex w-100 justify-content-between">
                         <h6 class="mb-1">${deadline.WorkItemName || 'Unnamed Work Item'}</h6>
                         <small class="text-${daysRemaining < 0 ? 'danger' : daysRemaining < 3 ? 'warning' : 'muted'}">
-                            ${formatDaysRemaining(daysRemaining)}
+                            ${daysText}
                         </small>
                     </div>
                     <p class="mb-1 small text-truncate">${deadline.ProjectName || 'Unassigned Project'}</p>
