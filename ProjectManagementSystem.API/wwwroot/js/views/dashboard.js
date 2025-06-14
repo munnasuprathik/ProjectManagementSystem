@@ -97,17 +97,6 @@ function ensureDashboardElements() {
                 
 
                 
-                <!-- Recent Work Items -->
-                <div class="card mb-4">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">Recent Work Items</h5>
-                        <a href="/workitems" class="btn btn-sm btn-outline-primary">View All</a>
-                    </div>
-                    <div class="card-body">
-                        <div id="recentWorkItemsContainer"></div>
-                    </div>
-                </div>
-                
                 <!-- Upcoming Deadlines -->
                 <div class="card">
                     <div class="card-header">
@@ -473,7 +462,7 @@ function renderProjectStats(dashboardData) {
     
     statsContainer.innerHTML = `
         <div class="row g-4 mb-4">
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card h-100 border-start border-4 border-primary">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -488,7 +477,7 @@ function renderProjectStats(dashboardData) {
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card h-100 border-start border-4 border-success">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -503,7 +492,7 @@ function renderProjectStats(dashboardData) {
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card h-100 border-start border-4 border-info">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center">
@@ -513,21 +502,6 @@ function renderProjectStats(dashboardData) {
                             </div>
                             <div class="icon-shape bg-info bg-opacity-10 text-info rounded-3">
                                 <i class="bi bi-people"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card h-100 border-start border-4 border-warning">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="text-uppercase text-muted mb-0">Work Items</h6>
-                                <h2 class="mb-0">${dashboardData.totalWorkItems}</h2>
-                            </div>
-                            <div class="icon-shape bg-warning bg-opacity-10 text-warning rounded-3">
-                                <i class="bi bi-list-task"></i>
                             </div>
                         </div>
                     </div>
