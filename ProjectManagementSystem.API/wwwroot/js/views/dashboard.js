@@ -272,7 +272,6 @@ export async function renderManagerDashboard() {
                                         <th style="width: 40px;"></th>
                                         <th>Name</th>
                                         <th>Email</th>
-                                        <th>Performance</th>
                                         <th>Workload</th>
                                         <th>Skills</th>
                                     </tr>
@@ -301,20 +300,6 @@ export async function renderManagerDashboard() {
                                                     <small class="text-muted">${role}</small>
                                                 </td>
                                                 <td>${email}</td>
-                                                <td>
-                                                    <div class="d-flex align-items-center">
-                                                        <div class="progress flex-grow-1 me-2" style="height: 6px;">
-                                                            <div class="progress-bar bg-${getPerformanceColor(performance)}" 
-                                                                 role="progressbar" 
-                                                                 style="width: ${formatValue(performance)}%" 
-                                                                 aria-valuenow="${formatValue(performance)}" 
-                                                                 aria-valuemin="0" 
-                                                                 aria-valuemax="100">
-                                                            </div>
-                                                        </div>
-                                                        <span class="text-nowrap">${formatValue(performance)}%</span>
-                                                    </div>
-                                                </td>
                                                 <td>
                                                     <div class="d-flex align-items-center">
                                                         <div class="progress flex-grow-1 me-2" style="height: 6px;">
@@ -589,12 +574,7 @@ function renderWorkItemsByStatus(workItemsByStatus, containerId) {
                                 <h2 class="mb-1">${count}</h2>
                                 <p class="text-muted mb-0">${status}</p>
                             </div>
-                            <div class="card-footer bg-transparent border-0 pt-0">
-                                <a href="workitems.html?status=${status.toLowerCase()}" 
-                                   class="btn btn-sm btn-outline-${statusColor} w-100">
-                                    View All <i class="bi bi-arrow-right ms-1"></i>
-                                </a>
-                            </div>
+                            <!-- View All button removed -->
                         </div>
                     </div>`;
                 }).join('')}
@@ -684,7 +664,6 @@ function renderProjectsTable(projects, containerId) {
         '        <th>Priority</th>',
         '        <th>Start Date</th>',
         '        <th>Deadline</th>',
-        '        <th>Work Items</th>',
         '        <th>Actions</th>',
         '      </tr>',
         '    </thead>',
@@ -705,7 +684,6 @@ function renderProjectsTable(projects, containerId) {
             '  <td>' + priorityBadge + '</td>',
             '  <td>' + startDate + '</td>',
             '  <td>' + deadline + '</td>',
-            '  <td>' + (project.WorkItemCount || 0) + '</td>',
             '  <td>',
             '    <div class="btn-group btn-group-sm" role="group">',
             '      <button class="btn btn-outline-primary view-work-items-btn"',
@@ -902,13 +880,7 @@ function renderWorkItemsTable(workItems, containerId, showProject = true) {
         let actionButtons = '';
         if (item.Status !== 'Done' && item.Status !== 'Cancelled') {
             actionButtons = [
-                '<div class="btn-group btn-group-sm">',
-                '  <button class="btn btn-outline-primary btn-sm"',
-                '          data-bs-toggle="modal"',
-                '          data-bs-target="#workItemDetailsModal"',
-                '          data-id="' + item.WorkItemId + '">',
-                '    <i class="bi bi-eye"></i> View',
-                '  </button>'
+                '<div class="btn-group btn-group-sm">'
             ];
 
             if (item.Status === 'ToDo') {
@@ -933,12 +905,6 @@ function renderWorkItemsTable(workItems, containerId, showProject = true) {
         } else {
             actionButtons = [
                 '<div class="btn-group btn-group-sm">',
-                '  <button class="btn btn-outline-secondary btn-sm"',
-                '          data-bs-toggle="modal"',
-                '          data-bs-target="#workItemDetailsModal"',
-                '          data-id="' + item.WorkItemId + '">',
-                '    <i class="bi bi-eye"></i> View',
-                '  </button>',
                 '</div>'
             ].join('\n');
         }
@@ -1794,29 +1760,13 @@ export async function renderEmployeeDashboard() {
                     </div>
                 </div>
                 
-                <div class="row">
-                    <!-- Recent Work Items -->
-                    <div class="col-lg-8 mb-4">
-                        <div class="card h-100">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">Recent Work Items</h5>
-                            </div>
-                            <div class="card-body">
-                                <div id="recentWorkItemsTable"></div>
-                            </div>
-                        </div>
+                <!-- Upcoming Deadlines - Full Width -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Upcoming Deadlines</h5>
                     </div>
-                    
-                    <!-- Upcoming Deadlines -->
-                    <div class="col-lg-4 mb-4">
-                        <div class="card h-100">
-                            <div class="card-header">
-                                <h5 class="mb-0">Upcoming Deadlines</h5>
-                            </div>
-                            <div class="card-body">
-                                <div id="upcomingDeadlinesList"></div>
-                            </div>
-                        </div>
+                    <div class="card-body">
+                        <div id="upcomingDeadlinesList"></div>
                     </div>
                 </div>
                 
@@ -1839,8 +1789,7 @@ export async function renderEmployeeDashboard() {
             welcomeMessage.innerHTML = `
                 <div class="d-flex align-items-center">
                     <div class="me-3">
-                        <span class="badge bg-primary me-2">Performance: ${formatPerformance(dashboardData.Performance || 0)}</span>
-                        <span class="badge bg-secondary">Workload: ${formatWorkload(dashboardData.Workload || 0)}</span>
+                        <span class="badge bg-primary fs-5 p-2">Workload: ${formatWorkload(dashboardData.Workload || 0)}</span>
                     </div>
                 </div>`;
         }
