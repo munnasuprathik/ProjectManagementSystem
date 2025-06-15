@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -21,19 +21,22 @@ namespace ProjectManagementSystem.API.Controllers
         private readonly IPerformanceService _performanceService;
         private readonly UserManager<User> _userManager;
         private readonly ILogger<WorkItemsController> _logger;
+        private readonly IEmailService _emailService;
 
         public WorkItemsController(
             ApplicationDbContext context,
             IWorkloadService workloadService,
             IPerformanceService performanceService,
             UserManager<User> userManager,
-            ILogger<WorkItemsController> logger)
+            ILogger<WorkItemsController> logger,
+            IEmailService emailService)
         {
             _context = context;
             _workloadService = workloadService;
             _performanceService = performanceService;
             _userManager = userManager;
             _logger = logger;
+            _emailService = emailService;
         }
 
         // GET: api/WorkItems
@@ -235,6 +238,26 @@ namespace ProjectManagementSystem.API.Controllers
                 userProfile.CurrentWorkload = (activeWorkItems + 1) * 10; // 10% per work item
                 userProfile.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
+            }
+
+            // Send email notification to the assigned employee
+            try
+            {
+                await _emailService.SendWorkItemAssignmentEmailAsync(
+                    assignedTo.Email!,
+                    assignedTo.UserName!,
+                    workItem.WorkItemName,
+                    project.ProjectName,
+                    workItem.Priority,
+                    workItem.Deadline ?? DateTime.UtcNow.AddDays(7),
+                    createdBy.UserName!
+                );
+                _logger.LogInformation($"Assignment email sent to {assignedTo.Email} for work item {workItem.WorkItemId}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to send assignment email to {assignedTo.Email} for work item {workItem.WorkItemId}");
+                // Don't fail the entire operation if email fails
             }
 
             return CreatedAtAction(nameof(GetWorkItem), new { id = workItem.WorkItemId }, MapToDto(workItem));
