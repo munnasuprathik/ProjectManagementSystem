@@ -43,17 +43,80 @@ class ApiClient {
 
     handleUnauthorized() {
         this.setToken(null);
-        window.location.href = '/login';
+        // Only redirect if not already on login page to prevent loops
+        if (!window.location.pathname.includes('/login')) {
+            window.location.href = '/login';
+        }
     }
 
     // Dashboard endpoints
     async getManagerDashboard() {
         try {
-            const response = await axios.get(`${this.baseUrl}/api/dashboard/manager`);
-            return response.data;
+            console.log('Fetching manager dashboard data...');
+            const timestamp = new Date().getTime();
+            
+            // First, get the dashboard data
+            const [dashboardResponse, projectsResponse] = await Promise.all([
+                axios.get(`${this.baseUrl}/api/dashboard/manager?t=${timestamp}`, {
+                    headers: {
+                        'Authorization': `Bearer ${this.token}`,
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    },
+                    withCredentials: true
+                }),
+                // Also fetch projects in parallel
+                this.getProjects()
+            ]);
+            
+            console.log('Dashboard API response:', dashboardResponse.data);
+            console.log('Projects API response:', projectsResponse);
+            
+            // Combine the dashboard data with projects
+            const dashboardData = {
+                ...dashboardResponse.data,
+                Projects: projectsResponse || []
+            };
+            
+            return dashboardData;
+            
         } catch (error) {
-            console.error('Failed to fetch manager dashboard:', error);
-            throw error;
+            console.error('Error fetching manager dashboard:', error);
+            
+            if (error.response) {
+                console.error('Error response data:', error.response.data);
+                console.error('Status:', error.response.status);
+                
+                // If unauthorized, redirect to login
+                if (error.response.status === 401) {
+                    console.log('Unauthorized - redirecting to login');
+                    this.handleUnauthorized();
+                    throw { success: false, message: 'Session expired. Please log in again.' };
+                }
+                
+                // For other errors, return empty data structure
+                console.warn('Non-401 error response from dashboard API');
+            } else {
+                console.error('No response received from dashboard API');
+            }
+            
+            // Return empty dashboard data structure on error
+            return {
+                TotalProjects: 0,
+                ActiveProjects: 0,
+                CompletedProjects: 0,
+                TotalWorkItems: 0,
+                WorkItemsByStatus: [],
+                ActiveMembers: 0,
+                TotalTeamMembers: 0,
+                OverdueWorkItems: 0,
+                DueSoonWorkItems: 0,
+                CompletionRate: 0,
+                RecentActivities: [],
+                UpcomingDeadlines: [],
+                LastUpdated: new Date().toISOString()
+            };
         }
     }
 
@@ -166,19 +229,64 @@ class ApiClient {
 
     async createWorkItem(workItemData) {
         try {
-            const response = await axios.post(`${this.baseUrl}/api/workitems`, workItemData, {
+            // Ensure required fields are present and properly formatted
+            if (!workItemData.workItemName) {
+                throw new Error('Work item name is required');
+            }
+            if (!workItemData.assignedToId) {
+                throw new Error('Assigned user is required');
+            }
+            if (!workItemData.priority) {
+                throw new Error('Priority is required');
+            }
+            if (!workItemData.projectId) {
+                throw new Error('Project is required');
+            }
+
+            // Format the payload to match the backend DTO
+            const payload = {
+                ProjectId: parseInt(workItemData.projectId, 10),
+                AssignedToId: workItemData.assignedToId,
+                WorkItemName: workItemData.workItemName.trim(),
+                Description: workItemData.description?.trim() || '',
+                Priority: workItemData.priority,
+                Deadline: workItemData.deadline ? new Date(workItemData.deadline).toISOString() : undefined
+            };
+
+            console.log('Sending work item creation request:', JSON.stringify(payload, null, 2));
+            
+            const response = await axios.post(`${this.baseUrl}/api/workitems`, payload, {
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                     'Authorization': `Bearer ${this.token}`
+                },
+                withCredentials: true
+            });
+            
+            console.log('Work item created successfully:', response.data);
+            return response.data;
+            
+        } catch (error) {
+            console.error('Error creating work item:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+                config: {
+                    url: error.config?.url,
+                    method: error.config?.method,
+                    data: error.config?.data
                 }
             });
-            return response.data;
-        } catch (error) {
-            console.error('Failed to create work item:', error);
-            if (error.response) {
-                // Attach response data to the error for better error handling
-                error.responseData = error.response.data;
+            
+            // If we have a response with error details, use that
+            if (error.response && error.response.data) {
+                const serverError = new Error(error.response.data.title || 'Failed to create work item');
+                serverError.response = error.response.data;
+                throw serverError;
             }
+            
+            // Re-throw the original error if we can't extract more details
             throw error;
         }
     }
@@ -364,50 +472,6 @@ class ApiClient {
         }
     }
 
-    async getCurrentUser() {
-        const response = await axios.get(`${this.baseUrl}/api/account/me`);
-        return response.data;
-    }
-    
-    // Dashboard endpoints
-    async getManagerDashboard() {
-        try {
-            console.log('Fetching manager dashboard data...');
-            const response = await axios.get(`${this.baseUrl}/api/dashboard/manager`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
-            console.log('Manager dashboard data:', response.data);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching manager dashboard:', error);
-            if (error.response?.status === 401) {
-                this.handleUnauthorized();
-            }
-            throw error;
-        }
-    }
-    
-    async getEmployeeDashboard() {
-        try {
-            console.log('Fetching employee dashboard data...');
-            const response = await axios.get(`${this.baseUrl}/api/dashboard/employee`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
-            console.log('Employee dashboard data:', response.data);
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching employee dashboard:', error);
-            if (error.response?.status === 401) {
-                this.handleUnauthorized();
-            }
-            throw error;
-        }
-    }
-
     // Projects endpoints
     async getProjects() {
         const response = await axios.get(`${this.baseUrl}/api/projects`);
@@ -416,27 +480,49 @@ class ApiClient {
     
     async createProject(projectData) {
         try {
-            console.log('Sending project creation request:', projectData);
-            const response = await axios.post(`${this.baseUrl}/api/projects`, projectData, {
+            console.log('=== Project Creation Debug ===');
+            console.log('API Base URL:', this.baseUrl);
+            console.log('Current token:', this.token ? 'Token exists' : 'No token found!');
+            console.log('Project data being sent:', JSON.stringify(projectData, null, 2));
+            
+            const config = {
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${this.token}`
+                    'Accept': 'application/json'
                 },
                 withCredentials: true
-            });
-            console.log('Project creation successful:', response.data);
+            };
+            
+            // Only add Authorization header if token exists
+            if (this.token) {
+                config.headers.Authorization = `Bearer ${this.token}`;
+            } else {
+                console.warn('No auth token found, making unauthenticated request');
+            }
+            
+            console.log('Sending request to:', `${this.baseUrl}/api/projects`);
+            console.log('Request config:', config);
+            
+            const response = await axios.post(`${this.baseUrl}/api/projects`, projectData, config);
+            
+            console.log('Project creation successful. Response:', response);
+            console.log('Response data:', response.data);
+            
             return { success: true, ...response.data };
         } catch (error) {
-            console.error('Error creating project:', error);
+            console.error('=== Error creating project ===');
+            console.error('Error details:', error);
+            
             if (error.response) {
                 // The request was made and the server responded with a status code
                 // that falls out of the range of 2xx
+                console.error('Error response status:', error.response.status);
+                console.error('Error response headers:', error.response.headers);
                 console.error('Error response data:', error.response.data);
-                console.error('Error status:', error.response.status);
                 
                 // Handle 401 Unauthorized
                 if (error.response.status === 401) {
+                    console.warn('Authentication failed, handling unauthorized access');
                     this.handleUnauthorized();
                 }
                 
@@ -479,79 +565,9 @@ class ApiClient {
         return response.data;
     }
 
-    // WorkItems endpoints
-    async getWorkItems(params = {}) {
-        const response = await axios.get(`${this.baseUrl}/api/workitems`, { params });
-        return response.data;
-    }
-
     async getWorkItem(id) {
         const response = await axios.get(`${this.baseUrl}/api/workitems/${id}`);
         return response.data;
-    }
-
-    async createWorkItem(workItemData) {
-        try {
-            // Ensure required fields are present and properly formatted
-            if (!workItemData.workItemName) {
-                throw new Error('Work item name is required');
-            }
-            if (!workItemData.assignedToId) {
-                throw new Error('Assigned user is required');
-            }
-            if (!workItemData.priority) {
-                throw new Error('Priority is required');
-            }
-            if (!workItemData.projectId) {
-                throw new Error('Project is required');
-            }
-
-            // Format the payload to match the backend DTO
-            const payload = {
-                ProjectId: parseInt(workItemData.projectId, 10),
-                AssignedToId: workItemData.assignedToId,
-                WorkItemName: workItemData.workItemName.trim(),
-                Description: workItemData.description?.trim() || '',
-                Priority: workItemData.priority,
-                Deadline: workItemData.deadline ? new Date(workItemData.deadline).toISOString() : undefined
-            };
-
-            console.log('Sending work item creation request:', JSON.stringify(payload, null, 2));
-            
-            const response = await axios.post(`${this.baseUrl}/api/workitems`, payload, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${this.token}`
-                },
-                withCredentials: true
-            });
-            
-            console.log('Work item created successfully:', response.data);
-            return response.data;
-            
-        } catch (error) {
-            console.error('Error creating work item:', {
-                message: error.message,
-                response: error.response?.data,
-                status: error.response?.status,
-                config: {
-                    url: error.config?.url,
-                    method: error.config?.method,
-                    data: error.config?.data
-                }
-            });
-            
-            // If we have a response with error details, use that
-            if (error.response && error.response.data) {
-                const serverError = new Error(error.response.data.title || 'Failed to create work item');
-                serverError.response = error.response.data;
-                throw serverError;
-            }
-            
-            // Re-throw the original error if we can't extract more details
-            throw error;
-        }
     }
 
     async updateWorkItemStatus(id, status) {
@@ -567,82 +583,6 @@ class ApiClient {
 
     async updateUserProfile(profileData) {
         const response = await axios.put(`${this.baseUrl}/api/profiles/me`, profileData);
-        return response.data;
-    }
-
-    // Dashboard endpoints
-    async getManagerDashboard() {
-        try {
-            console.log('Fetching manager dashboard data...');
-            const timestamp = new Date().getTime();
-            
-            // First, get the dashboard data
-            const [dashboardResponse, projectsResponse] = await Promise.all([
-                axios.get(`${this.baseUrl}/api/dashboard/manager?t=${timestamp}`, {
-                    headers: {
-                        'Authorization': `Bearer ${this.token}`,
-                        'Cache-Control': 'no-cache, no-store, must-revalidate',
-                        'Pragma': 'no-cache',
-                        'Expires': '0'
-                    },
-                    withCredentials: true
-                }),
-                // Also fetch projects in parallel
-                this.getProjects()
-            ]);
-            
-            console.log('Dashboard API response:', dashboardResponse.data);
-            console.log('Projects API response:', projectsResponse);
-            
-            // Combine the dashboard data with projects
-            const dashboardData = {
-                ...dashboardResponse.data,
-                Projects: projectsResponse || []
-            };
-            
-            return dashboardData;
-            
-        } catch (error) {
-            console.error('Error fetching manager dashboard:', error);
-            
-            if (error.response) {
-                console.error('Error response data:', error.response.data);
-                console.error('Status:', error.response.status);
-                
-                // If unauthorized, redirect to login
-                if (error.response.status === 401) {
-                    console.log('Unauthorized - redirecting to login');
-                    this.handleUnauthorized();
-                    throw { success: false, message: 'Session expired. Please log in again.' };
-                }
-                
-                // For other errors, return empty data structure
-                console.warn('Non-401 error response from dashboard API');
-            } else {
-                console.error('No response received from dashboard API');
-            }
-            
-            // Return empty dashboard data structure on error
-            return {
-                TotalProjects: 0,
-                ActiveProjects: 0,
-                CompletedProjects: 0,
-                TotalWorkItems: 0,
-                WorkItemsByStatus: [],
-                ActiveMembers: 0,
-                TotalTeamMembers: 0,
-                OverdueWorkItems: 0,
-                DueSoonWorkItems: 0,
-                CompletionRate: 0,
-                RecentActivities: [],
-                UpcomingDeadlines: [],
-                LastUpdated: new Date().toISOString()
-            };
-        }
-    }
-
-    async getEmployeeDashboard() {
-        const response = await axios.get(`${this.baseUrl}/api/dashboard/employee`);
         return response.data;
     }
 
@@ -733,29 +673,6 @@ class ApiClient {
                 }
             ];
         }
-    }
-
-    async getTeamMember(userId) {
-        const response = await axios.get(`${this.baseUrl}/api/profiles/employees/${userId}`);
-        return response.data;
-    }
-
-    async updateTeamMember(userId, memberData) {
-        const response = await axios.put(`${this.baseUrl}/api/profiles/employees/${userId}`, memberData);
-        return response.data;
-    }
-
-    async updateTeamMemberStatus(userId, isActive) {
-        const response = await axios.patch(
-            `${this.baseUrl}/api/profiles/employees/${userId}/status`,
-            { isActive }
-        );
-        return response.data;
-    }
-
-    async getTeamMemberWorkItems(userId) {
-        const response = await axios.get(`${this.baseUrl}/api/profiles/employees/${userId}/workitems`);
-        return response.data;
     }
 }
 

@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { auth } from '../auth.js';
+import auth from '../authState.js';
 import { formatDate, formatDaysRemaining } from '../utils/dateUtils.js';
 
 // Alias for backward compatibility
@@ -7,13 +7,12 @@ const Auth = { getInstance: () => auth };
 import { createPieChart, createBarChart, createLineChart } from '../utils/uiComponents.js';
 import { 
     showToast, 
-    formatPerformance, 
+    
     formatWorkload, 
     formatStatusBadge, 
     formatPriorityBadge,
     showLoading 
 } from '../utils/uiUtils.js';
-import { renderProjectsList } from './projects.js';
 
 
 // Initialize dashboard based on user role
@@ -493,32 +492,7 @@ function renderProjectStats(dashboardData) {
                 </div>
             </div>
         </div>
-        <div class="row g-4 mb-4">
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Work Items by Status</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container" style="position: relative; height: 300px;">
-                            <canvas id="workItemsByStatusChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Team Workload Distribution</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container" style="position: relative; height: 300px;">
-                            <canvas id="employeesByWorkloadChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- Charts have been removed as per user request -->
     `;
 }
 
@@ -999,143 +973,16 @@ function renderUpcomingDeadlines(deadlines, containerId) {
 function initManagerCharts(dashboardData) {
     console.log('=== DEBUG: Dashboard Data Structure ===');
     console.log('All dashboard data keys:', Object.keys(dashboardData));
-    console.log('WorkItemsByStatus type:', typeof dashboardData.WorkItemsByStatus);
-    console.log('WorkItemsByStatus array length:', dashboardData.WorkItemsByStatus?.length || 0);
     
-    // Log each item in WorkItemsByStatus with all its properties
+    // Charts have been removed as per user request
+    // - Removed Work Items by Status chart
+    // - Removed Team Workload Distribution chart
     
-    // Work Items by Status Pie Chart
-    let workItemsByStatus = dashboardData.WorkItemsByStatus || dashboardData.workItemsByStatus || [];
-    console.log('Work items by status raw data:', workItemsByStatus);
+    // The following chart initialization code has been removed:
+    // - Work Items by Status Pie Chart
+    // - Employees by Workload Bar Chart
     
-    // If WorkItemsByStatus is empty but workItems is available, try to process it
-    if ((!workItemsByStatus || workItemsByStatus.length === 0) && dashboardData.workItems) {
-        console.log('Processing work items data to generate status counts');
-        // Group work items by status
-        const statusCounts = {};
-        dashboardData.workItems.forEach(item => {
-            // Handle both camelCase and PascalCase property names
-            const status = item.status || item.Status || 'Unknown';
-            if (status) {
-                statusCounts[status] = (statusCounts[status] || 0) + 1;
-            }
-        });
-        
-        // Convert to array format expected by the chart
-        workItemsByStatus = Object.entries(statusCounts).map(([status, count]) => ({
-            status: status.charAt(0).toUpperCase() + status.slice(1), // Capitalize first letter
-            count
-        }));
-        console.log('Processed work items by status:', workItemsByStatus);
-    }
-
-    if (workItemsByStatus.length > 0) {
-        const statusCtx = document.getElementById('workItemsByStatusChart');
-        if (statusCtx) {
-            try {
-                // Process status data
-                const statusData = workItemsByStatus.map(item => ({
-                    status: item.status || item.Status || item.key || 'Unknown',
-                    count: item.count || item.value || 0
-                }));
-                
-                console.log('Processed status data:', statusData);
-                
-                createPieChart(statusCtx.getContext('2d'), {
-                    labels: statusData.map(item => item.status),
-                    data: statusData.map(item => item.count),
-                    label: 'Work Items by Status',
-                    colors: [
-                        '#6c757d', // ToDo - Gray
-                        '#0d6efd', // InProgress - Blue
-                        '#0dcaf0', // Review - Cyan
-                        '#198754', // Done - Green
-                        '#dc3545'  // Cancelled - Red
-                    ]
-                });
-                console.log('Work items by status chart initialized');
-            } catch (error) {
-                console.error('Error initializing work items chart:', error);
-                // Show error message in the UI
-                const chartContainer = statusCtx.closest('.card-body');
-                if (chartContainer) {
-                    chartContainer.innerHTML = '<p class="text-danger">Error loading work items chart</p>';
-                }
-            }
-        } else {
-            console.warn('Work items chart container not found');
-        }
-    } else {
-        console.warn('No work items by status data available');
-        // Show a message in the UI
-        const chartContainer = document.querySelector('#workItemsByStatusChart')?.closest('.card-body');
-        if (chartContainer) {
-            chartContainer.innerHTML = '<p class="text-muted">No work items data available</p>';
-        }
-    }
-
-    // Employees by Workload Bar Chart
-    const employeesByWorkload = dashboardData.EmployeesByWorkload || 
-                              dashboardData.employeesByWorkload || 
-                              dashboardData.teamMembers || [];
-                              
-    console.log('Employees by workload raw data:', employeesByWorkload);
-    
-    if (employeesByWorkload.length > 0) {
-        const workloadCtx = document.getElementById('employeesByWorkloadChart');
-        if (workloadCtx) {
-            try {
-                // Process employee data to get names and workload
-                const employeeData = employeesByWorkload.map(item => {
-                    // Handle different possible property names
-                    const name = item.name || 
-                               item.employeeName || 
-                               item.fullName || 
-                               (item.firstName && item.lastName ? `${item.firstName} ${item.lastName}` : 'Unknown');
-                                
-                    const workload = item.workload || 
-                                   item.workloadPercentage || 
-                                   item.currentWorkload || 
-                                   (item.performance ? 100 - item.performance : 0);
-                    
-                    return { name, workload: Math.min(100, Math.max(0, workload)) };
-                });
-
-                // Sort by workload descending
-                employeeData.sort((a, b) => b.workload - a.workload);
-
-                // Limit to top 10 employees if there are many
-                const displayData = employeeData.slice(0, 10);
-                console.log('Processed employee workload data:', displayData);
-
-                createBarChart(workloadCtx.getContext('2d'), {
-                    labels: displayData.map(item => item.name),
-                    data: displayData.map(item => item.workload),
-                    label: 'Workload %',
-                    backgroundColor: Array(displayData.length).fill('#0d6efd'), // Blue bars
-                    borderColor: '#0a58ca',
-                    borderWidth: 1
-                });
-                console.log('Employees by workload chart initialized with data:', displayData);
-            } catch (error) {
-                console.error('Error initializing workload chart:', error);
-                // Show error message in the UI
-                const chartContainer = workloadCtx.closest('.card-body');
-                if (chartContainer) {
-                    chartContainer.innerHTML = '<p class="text-danger">Error loading workload chart</p>';
-                }
-            }
-        } else {
-            console.warn('Workload chart container not found');
-        }
-    } else {
-        console.log('No employees by workload data available');
-        // Show a message in the UI
-        const chartContainer = document.querySelector('#employeesByWorkloadChart')?.closest('.card-body');
-        if (chartContainer) {
-            chartContainer.innerHTML = '<p class="text-muted">No workload data available</p>';
-        }
-    }
+    console.log('Charts have been removed from the dashboard as per user request');
 }
 
 // Update work item status
@@ -1687,15 +1534,164 @@ function escapeHtml(unsafe) {
         .replace(/'/g, '&#039;');
 }
 
+// Initialize project creation form
+function initProjectCreationForm() {
+    console.log('Initializing project creation form...');
+    const form = document.getElementById('createProjectForm');
+    if (!form) {
+        console.error('Create project form not found!');
+        return;
+    }
+
+    // Ensure toast container exists
+    if (!document.querySelector('.toast-container')) {
+        const toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        toastContainer.style.zIndex = '1090';
+        document.body.appendChild(toastContainer);
+    }
+    
+    // Add click handler to the submit button instead of form submit
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.addEventListener('click', handleFormSubmit);
+        console.log('Added click handler to submit button');
+    } else {
+        console.error('Submit button not found in the form!');
+    }
+    
+    // Handle form submission
+    async function handleFormSubmit(e) {
+        console.log('Form submission started...');
+        e.preventDefault();
+        e.stopPropagation();
+        
+        try {
+            const formData = new FormData(form);
+            const projectData = {
+                projectName: formData.get('projectName'),
+                description: formData.get('projectDescription'),
+                startDate: formData.get('startDate'),
+                deadline: formData.get('deadline'),
+                requirements: formData.get('requirements'),
+                priority: formData.get('priority')
+            };
+            
+            console.log('Form data collected:', projectData);
+            
+            // Validate required fields
+            const errors = [];
+            
+            if (!projectData.projectName?.trim()) {
+                errors.push('Project name is required');
+            }
+            
+            if (!projectData.requirements?.trim()) {
+                errors.push('Requirements are required');
+            }
+            
+            if (!projectData.priority) {
+                errors.push('Priority is required');
+            }
+            
+            // Set default start date to today if not provided
+            if (!projectData.startDate) {
+                projectData.startDate = new Date().toISOString().split('T')[0];
+            }
+            
+            // Set default deadline to 30 days from now if not provided
+            if (!projectData.deadline) {
+                const deadline = new Date();
+                deadline.setDate(deadline.getDate() + 30);
+                projectData.deadline = deadline.toISOString().split('T')[0];
+            }
+            
+            if (errors.length > 0) {
+                console.error('Validation errors:', errors);
+                showToast(errors.join('<br>'), 'error');
+                return;
+            }
+
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const spinner = document.getElementById('createProjectSpinner');
+            const btnText = document.getElementById('createProjectBtnText');
+            
+            // Show loading state
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                if (spinner) spinner.classList.remove('d-none');
+                if (btnText) btnText.textContent = 'Creating...';
+            }
+            
+            console.log('Sending project creation request...');
+            const result = await api.createProject(projectData);
+            console.log('Project creation response:', result);
+            
+            if (result && result.success) {
+                showToast('Project created successfully!', 'success');
+                console.log('Project created successfully');
+                
+                // Close the modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('createProjectModal'));
+                if (modal) {
+                    modal.hide();
+                    console.log('Modal closed');
+                }
+                
+                // Reset form
+                form.reset();
+                console.log('Form reset');
+                
+                // Refresh the dashboard
+                await renderManagerDashboard();
+                console.log('Dashboard refreshed');
+            } else {
+                const errorMsg = result?.message || 'Failed to create project. Please try again.';
+                console.error('Project creation failed:', errorMsg);
+                showToast(errorMsg, 'error');
+            }
+        } catch (error) {
+            console.error('Error in form submission:', error);
+            let errorMessage = 'Failed to create project. Please try again.';
+            
+            if (error.response) {
+                console.error('Error response data:', error.response.data);
+                console.error('Error status:', error.response.status);
+                errorMessage = error.response.data?.message || errorMessage;
+            } else if (error.request) {
+                console.error('No response received:', error.request);
+                errorMessage = 'No response from server. Please check your connection.';
+            }
+            
+            showToast(errorMessage, 'error');
+        } finally {
+            // Reset button state
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const spinner = document.getElementById('createProjectSpinner');
+            const btnText = document.getElementById('createProjectBtnText');
+            
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                if (btnText) btnText.textContent = 'Create Project';
+                console.log('Submit button state reset');
+            }
+        }
+    }
+}
+
 // Initialize the dashboard when the page loads
 document.addEventListener('DOMContentLoaded', async () => {
     try {
+        console.log('DOM fully loaded, initializing dashboard...');
+        
         // Create toast container if it doesn't exist
         if (!document.querySelector('.toast-container')) {
             const toastContainer = document.createElement('div');
             toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
             toastContainer.style.zIndex = '1090';
             document.body.appendChild(toastContainer);
+            console.log('Toast container created');
         }
 
         // Initialize Bootstrap dropdowns
@@ -1705,6 +1701,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return new bootstrap.Dropdown(dropdownToggleEl);
             });
         };
+        
+        // Initialize project creation form
+        initProjectCreationForm();
+        console.log('Project creation form initialized');
 
         // Check authentication
         const auth = await Auth.getInstance();
@@ -1846,6 +1846,9 @@ export async function renderEmployeeDashboard() {
         tooltipTriggerList.forEach(tooltipTriggerEl => {
             new bootstrap.Tooltip(tooltipTriggerEl);
         });
+        
+        // Initialize project creation form
+        initProjectCreationForm();
         
     } catch (error) {
         console.error('Error loading employee dashboard:', error);

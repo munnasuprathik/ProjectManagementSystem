@@ -31,14 +31,6 @@ export function showToast(message, type = 'info') {
         toast.remove();
     });
 }
-
-// Format performance value with color coding
-export function formatPerformance(performance) {
-    if (performance >= 80) return `<span class="text-success fw-bold">${performance}%</span>`;
-    if (performance >= 50) return `<span class="text-warning fw-bold">${performance}%</span>`;
-    return `<span class="text-danger fw-bold">${performance}%</span>`;
-}
-
 // Format workload value with color coding
 export function formatWorkload(workload) {
     if (workload >= 80) return `<span class="text-danger fw-bold">${workload}%</span>`;

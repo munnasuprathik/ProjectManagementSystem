@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// Define routes with exact match// Root route
+// Root route
 router.addRoute('/', async () => {
     console.log('Root route handler called');
     try {
@@ -104,7 +104,7 @@ router.addRoute('/', async () => {
     } catch (error) {
         console.error('Error in root route handler:', error);
         // Clear potentially corrupted auth state
-        auth.logout();
+        
         router.navigateTo('/login');
     }
 }, { exact: true });
@@ -158,14 +158,6 @@ function redirectBasedOnRole(user) {
 router.addRoute('/login', async () => {
     console.log('Login route handler called');
     try {
-        // Only check authentication if we're not already on the login page
-        if (window.location.pathname !== '/login' && auth.isAuthenticated()) {
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            console.log('User in login route:', user);
-            redirectBasedOnRole(user);
-            return;
-        }
-        
         // Clear any existing content
         const appElement = document.getElementById('app');
         if (appElement) {
@@ -221,148 +213,26 @@ router.addRoute('/dashboard/manager', async () => {
     }
 }, { exact: true });
 
-// Add other dashboard routes
-router.addRoute('/dashboard', () => {
-    // Redirect to appropriate dashboard based on role
-    if (auth.isAuthenticated()) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        if (user.role === 'Manager') {
-            router.navigateTo('/dashboard/manager');
-        } else {
-            router.navigateTo('/dashboard/employee');
-        }
-    } else {
-        router.navigateTo('/login');
-    }
-});
-
-// Add catch-all route for other dashboard paths
-router.addRoute('/dashboard/*', () => {
-    console.log('Catch-all dashboard route handler called');
-    if (!auth.isAuthenticated()) {
-        router.navigateTo('/login');
-        return;
-    }
-    
-    // Extract the remaining path after /dashboard/
-    const path = window.location.pathname;
-    const remainingPath = path.replace(/^\/dashboard\//, '');
-    
-    // If it's a known sub-route, navigate there, otherwise redirect to appropriate dashboard
-    if (remainingPath && remainingPath !== '') {
-        router.navigateTo(`/dashboard/${remainingPath}`);
-    } else {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        if (user.role === 'Manager') {
-            router.navigateTo('/dashboard/manager');
-        } else {
-            router.navigateTo('/dashboard/employee');
-        }
-    }
-});
-
-// Profile route
-router.addRoute('/#/dashboard/profile', async () => {
-    console.log('Profile route handler called');
+// Main dashboard route - handles redirection to appropriate dashboard
+router.addRoute('/dashboard', async () => {
+    console.log('Dashboard route handler called');
     if (!auth.isAuthenticated()) {
         router.navigateTo('/login');
         return;
     }
     
     try {
-        const app = document.getElementById('app');
-        app.innerHTML = `
-            <div class="container mt-4">
-                <h2>User Profile</h2>
-                <div class="card">
-                    <div class="card-body">
-                        <div class="d-flex align-items-center mb-4">
-                            <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" 
-                                 style="width: 60px; height: 60px; font-size: 24px;">
-                                ${auth.currentUser?.email?.charAt(0).toUpperCase() || 'U'}
-                            </div>
-                            <div>
-                                <h4 class="mb-0">${auth.currentUser?.email || 'User'}</h4>
-                                <p class="text-muted mb-0">${auth.isManager() ? 'Manager' : 'Employee'}</p>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <h5>Account Information</h5>
-                            <p class="mb-1"><strong>Email:</strong> ${auth.currentUser?.email || 'N/A'}</p>
-                            <p class="mb-1"><strong>Role:</strong> ${auth.isManager() ? 'Manager' : 'Employee'}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user.role === 'Manager') {
+            router.navigateTo('/dashboard/manager');
+        } else {
+            router.navigateTo('/dashboard/employee');
+        }
     } catch (error) {
-        console.error('Error rendering profile page:', error);
-        router.navigateTo('/dashboard');
-    }
-});
-
-// Work Items route
-router.addRoute('/dashboard/workitems', async () => {
-    console.log('Work Items route handler called');
-    if (!auth.isAuthenticated()) {
+        console.error('Error in dashboard route:', error);
         router.navigateTo('/login');
-        return;
     }
-    
-    try {
-        const app = document.getElementById('app');
-        app.innerHTML = `
-            <div class="container mt-4">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2>My Work Items</h2>
-                    <button class="btn btn-primary" id="createWorkItemBtn">
-                        <i class="bi bi-plus-lg me-1"></i> New Work Item
-                    </button>
-                </div>
-                <div class="card">
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Title</th>
-                                        <th>Project</th>
-                                        <th>Status</th>
-                                        <th>Priority</th>
-                                        <th>Due Date</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="workItemsList">
-                                    <tr>
-                                        <td colspan="6" class="text-center">Loading work items...</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Here you would typically load work items from the API
-        // For now, we'll just show a message
-        setTimeout(() => {
-            const workItemsList = document.getElementById('workItemsList');
-            if (workItemsList) {
-                workItemsList.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="text-center">No work items found.</td>
-                    </tr>
-                `;
-            }
-        }, 500);
-        
-    } catch (error) {
-        console.error('Error rendering work items page:', error);
-        router.navigateTo('/dashboard');
-    }
-});
+}, { exact: true });
 
 // Projects route (for managers)
 router.addRoute('/dashboard/projects', async () => {
@@ -426,10 +296,29 @@ router.addRoute('/dashboard/projects', async () => {
     }
 });
 
-// Add a catch-all route for 404
-router.addRoute('*', () => {
-    console.log('No matching route found, redirecting to dashboard');
-    router.navigateTo('/dashboard');
+// Catch-all dashboard routes
+router.addRoute('/dashboard/*', () => {
+    console.log('Catch-all dashboard route handler called');
+    if (!auth.isAuthenticated()) {
+        router.navigateTo('/login');
+        return;
+    }
+    
+    // Extract the remaining path after /dashboard/
+    const path = window.location.pathname;
+    const remainingPath = path.replace(/^\/dashboard\//, '');
+    
+    // If it's a known sub-route, navigate there, otherwise redirect to appropriate dashboard
+    if (remainingPath && remainingPath !== '') {
+        router.navigateTo(`/dashboard/${remainingPath}`);
+    } else {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user.role === 'Manager') {
+            router.navigateTo('/dashboard/manager');
+        } else {
+            router.navigateTo('/dashboard/employee');
+        }
+    }
 });
 
 // Handle back/forward browser buttons

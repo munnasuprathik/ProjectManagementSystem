@@ -249,7 +249,7 @@ namespace ProjectManagementSystem.API.Controllers
                     workItem.WorkItemName,
                     project.ProjectName,
                     workItem.Priority,
-                    workItem.Deadline ?? DateTime.UtcNow.AddDays(7),
+                    workItem.Deadline,
                     createdBy.UserName!
                 );
                 _logger.LogInformation($"Assignment email sent to {assignedTo.Email} for work item {workItem.WorkItemId}");

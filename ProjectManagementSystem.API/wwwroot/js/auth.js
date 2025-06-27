@@ -3,45 +3,92 @@ import { api } from './api.js';
 export class Auth {
     constructor() {
         this.currentUser = null;
-        this.init();
+        this.isInitializing = false;
+        // Don't call init() in constructor to prevent issues during module loading
+        this.loadFromStorage();
+    }
+
+    loadFromStorage() {
+        try {
+            const token = localStorage.getItem('authToken');
+            const userData = localStorage.getItem('user');
+            
+            if (token && userData) {
+                this.currentUser = JSON.parse(userData);
+                console.log('Loaded user from storage:', this.currentUser);
+            }
+        } catch (error) {
+            console.error('Error loading from storage:', error);
+            this.clearAuthData();
+        }
     }
 
     async init() {
+        // Prevent multiple simultaneous init calls
+        if (this.isInitializing) {
+            console.log('Auth init already in progress, skipping...');
+            return;
+        }
+
         try {
+            this.isInitializing = true;
             console.log('Auth.init called');
+            
             const token = localStorage.getItem('authToken');
-            if (token) {
-                console.log('Found auth token, fetching current user...');
-                const userData = await api.getCurrentUser();
+            if (!token) {
+                console.log('No auth token found');
+                return;
+            }
+
+            console.log('Found auth token, fetching current user...');
+            const userData = await api.getCurrentUser();
+            
+            if (userData) {
+                // Normalize user data with consistent role handling
+                this.currentUser = {
+                    ...userData,
+                    role: userData.role || userData.Role || 'Employee',
+                    email: userData.email || userData.Email || '',
+                    fullName: userData.fullName || userData.FullName || '',
+                    userId: userData.userId || userData.UserId || userData.id || ''
+                };
                 
-                if (userData) {
-                    // Normalize user data with consistent role handling
-                    this.currentUser = {
-                        ...userData,
-                        role: userData.role || userData.Role || 'Employee',
-                        email: userData.email || userData.Email || '',
-                        fullName: userData.fullName || userData.FullName || '',
-                        userId: userData.userId || userData.UserId || userData.id || ''
-                    };
-                    
-                    console.log('Fetched and normalized user data:', JSON.stringify(this.currentUser, null, 2));
-                    
-                    // Store the normalized user data in localStorage
-                    localStorage.setItem('user', JSON.stringify(this.currentUser));
-                } else {
-                    console.warn('No user data received from getCurrentUser()');
-                }
+                console.log('Fetched and normalized user data:', JSON.stringify(this.currentUser, null, 2));
+                
+                // Store the normalized user data in localStorage
+                localStorage.setItem('user', JSON.stringify(this.currentUser));
+            } else {
+                console.warn('No user data received from getCurrentUser()');
+                this.clearAuthData();
             }
         } catch (error) {
             console.error('Failed to initialize auth:', error);
-            this.logout();
+            // Clear auth data on initialization error
+            this.clearAuthData();
+        } finally {
+            this.isInitializing = false;
         }
     }
 
     isAuthenticated() {
+        // Check if we have a token and user data
         const token = localStorage.getItem('authToken');
-        const user = localStorage.getItem('user');
-        return !!(token && user);
+        const userData = localStorage.getItem('user');
+        
+        if (token && userData) {
+            try {
+                // Only update currentUser if we don't already have it
+                if (!this.currentUser) {
+                    this.currentUser = JSON.parse(userData);
+                }
+                return true;
+            } catch (e) {
+                console.error('Error parsing user data:', e);
+                this.clearAuthData();
+                return false;
+            }
+        }
+        return false;
     }
 
     async login(email, password) {
@@ -97,65 +144,13 @@ export class Auth {
     }
 
     logout() {
-        console.log('Logging out user...');
-        try {
-            // Clear all local storage related to authentication
-            const keysToRemove = [];
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && (key.startsWith('auth') || key.startsWith('user') || key.startsWith('currentUser'))) {
-                    keysToRemove.push(key);
-                }
-            }
-            
-            keysToRemove.forEach(key => localStorage.removeItem(key));
-            
-            // Clear API token and current user
-            api.setToken(null);
-            this.currentUser = null;
-            
-            // Clear any session storage that might be used
-            sessionStorage.clear();
-            
-            console.log('User logged out successfully - redirecting to login');
-            
-            // Force a full page reload with a timestamp to prevent caching
-            const timestamp = new Date().getTime();
-            const loginUrl = `${window.location.origin}/index.html?logout=${timestamp}`;
-            
-            // Replace the current history entry to prevent back button issues
-            window.history.replaceState(null, null, loginUrl);
-            
-            // Force a hard redirect to break out of the SPA
-            window.location.href = loginUrl;
-            
-            // Force a reload to ensure clean state
-            window.location.reload(true);
-            
-            return { success: true };
-        } catch (error) {
-            console.error('Error during logout:', error);
-            // Last resort - redirect to root
-            window.location.href = '/';
-            return { success: false, error: error.message };
-        }
+        this.clearAuthData();
     }
 
-    isAuthenticated() {
-        // Check if we have a token and user data
-        const token = localStorage.getItem('authToken');
-        const userData = localStorage.getItem('user');
-        
-        if (token && userData) {
-            try {
-                this.currentUser = JSON.parse(userData);
-                return true;
-            } catch (e) {
-                console.error('Error parsing user data:', e);
-                return false;
-            }
-        }
-        return false;
+    clearAuthData() {
+        this.currentUser = null;
+        localStorage.removeItem('user');
+        localStorage.removeItem('authToken');
     }
     
     setAuthenticated(isAuthenticated, isManager = false) {
@@ -167,21 +162,31 @@ export class Auth {
             };
             localStorage.setItem('user', JSON.stringify(this.currentUser));
         } else {
-            this.currentUser = null;
-            localStorage.removeItem('user');
-            localStorage.removeItem('authToken');
+            this.clearAuthData();
         }
     }
 
     isManager() {
+        // Ensure we have current user data
+        if (!this.currentUser && this.isAuthenticated()) {
+            // This will load currentUser from storage if needed
+        }
         return this.currentUser?.role === 'Manager';
     }
 
     isEmployee() {
+        // Ensure we have current user data
+        if (!this.currentUser && this.isAuthenticated()) {
+            // This will load currentUser from storage if needed
+        }
         return this.currentUser?.role === 'Employee';
     }
 
     getCurrentUser() {
+        // Ensure we have current user data
+        if (!this.currentUser && this.isAuthenticated()) {
+            // This will load currentUser from storage if needed
+        }
         return this.currentUser;
     }
 }

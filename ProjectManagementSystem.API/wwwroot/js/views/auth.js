@@ -1,5 +1,5 @@
 import auth from '../authState.js';
-import { router } from '../router.js';
+
 
 // Login View
 export async function renderLoginView() {

@@ -93,19 +93,17 @@ class Router {
             const route = this.findMatchingRoute(path);
             const currentPath = window.location.pathname;
 
-            // Check authentication
-            if (route?.authRequired && !auth.isAuthenticated()) {
+            // Check authentication - but NOT for login page
+            if (route?.authRequired && !auth.isAuthenticated() && currentPath !== '/login') {
                 console.log('Route requires authentication, redirecting to login...');
-                if (currentPath !== '/login') {
-                    sessionStorage.setItem('redirectAfterLogin', currentPath);
-                }
-                window.location.href = '/login';
+                sessionStorage.setItem('redirectAfterLogin', currentPath);
+                this.navigateTo('/login');
                 return;
             }
 
             // Check authorization for manager-only routes
             if (route?.managerOnly && !auth.isManager()) {
-                window.location.href = '/unauthorized';
+                this.navigateTo('/unauthorized');
                 return;
             }
 
@@ -119,14 +117,14 @@ class Router {
                     this.currentRoute = route;
                 } catch (error) {
                     console.error('Error rendering route:', error);
-                    window.location.href = '/error';
+                    this.navigateTo('/error');
                 }
             } else {
-                window.location.href = '/not-found';
+                this.navigateTo('/not-found');
             }
         } catch (error) {
             console.error('Error in handleRouteChange:', error);
-            window.location.href = '/error';
+            this.navigateTo('/error');
         } finally {
             // Clear navigation lock after a short delay to prevent rapid re-navigation
             this.navigationTimeout = setTimeout(() => {
@@ -140,17 +138,33 @@ class Router {
         
         // First try to find an exact match
         for (const route of this.routes) {
-            if (route.path === path) {
+            if (route.exact && route.path === path) {
                 console.log('Found exact route match:', route.path);
                 return route;
             }
         }
         
-        // If no exact match, try to find a prefix match (for nested routes)
+        // Then try non-exact matches
         for (const route of this.routes) {
-            if (!route.exact && path.startsWith(route.path)) {
-                console.log('Found prefix route match:', route.path);
-                return route;
+            if (!route.exact) {
+                // Handle wildcard routes
+                if (route.path.endsWith('/*')) {
+                    const basePath = route.path.slice(0, -2);
+                    if (path.startsWith(basePath)) {
+                        console.log('Found wildcard route match:', route.path);
+                        return route;
+                    }
+                }
+                // Handle exact path match for non-exact routes
+                else if (route.path === path) {
+                    console.log('Found non-exact route match:', route.path);
+                    return route;
+                }
+                // Handle prefix match for non-exact routes
+                else if (path.startsWith(route.path) && path !== route.path) {
+                    console.log('Found prefix route match:', route.path);
+                    return route;
+                }
             }
         }
         
