@@ -1,18 +1,28 @@
+
 import { Router } from './router.js';
 import { auth } from './auth.js';
 import { renderLoginView } from './views/auth.js';
 import { renderEmployeeDashboard } from './views/dashboard.js';
 import { renderManagerDashboard } from './views/dashboard.js';
-
 // Initialize router
 const router = new Router();
-
+// Flag to prevent multiple initializations
+let isInitializing = false;
 // Check auth status when app loads
 document.addEventListener('DOMContentLoaded', async () => {
+    // Prevent multiple initializations
+    if (isInitializing) {
+        console.log('App already initializing, skipping...');
+        return;
+    }
+    
+    isInitializing = true;
+    
     // Check if app element exists
     const appElement = document.getElementById('app');
     if (!appElement) {
         console.error('App element not found in the DOM');
+        isInitializing = false;
         return;
     }
     
@@ -24,29 +34,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('Is authenticated:', isAuthenticated);
         
         if (!isAuthenticated) {
-            console.log('User not authenticated, redirecting to login');
-            router.navigateTo('/login');
-            return;
-        }
-        
-        // Get user data from localStorage
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        console.log('User from localStorage:', user);
-        
-        // If we don't have a role, try to refresh the user data
-        if (!user.role) {
-            console.log('No role found in user data, refreshing...');
-            try {
-                await auth.init();
-                const updatedUser = JSON.parse(localStorage.getItem('user') || '{}');
-                console.log('Updated user after init:', updatedUser);
-                redirectBasedOnRole(updatedUser);
-            } catch (error) {
-                console.error('Error refreshing user data:', error);
-                router.navigateTo('/login');
-            }
+            console.log('User not authenticated, will redirect to login via router');
+            // Don't call navigateTo here - let the router handle it
         } else {
-            redirectBasedOnRole(user);
+            // Get user data from localStorage
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            console.log('User from localStorage:', user);
+            
+            // If we don't have a role, try to refresh the user data
+            if (!user.role) {
+                console.log('No role found in user data, refreshing...');
+                try {
+                    await auth.init();
+                    const updatedUser = JSON.parse(localStorage.getItem('user') || '{}');
+                    console.log('Updated user after init:', updatedUser);
+                } catch (error) {
+                    console.error('Error refreshing user data:', error);
+                    // Clear auth and let router handle redirect
+                    auth.clearAuthData();
+                }
+            }
         }
         
         // Hide loading spinner
@@ -56,13 +63,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             loadingElement.style.display = 'none';
             console.log('Loading spinner hidden');
         }
+        
     } catch (error) {
         console.error('Error initializing app:', error);
-        // Fallback to login on error
-        router.navigateTo('/login');
+        // Clear potentially corrupted auth state
+        auth.clearAuthData();
+    } finally {
+        isInitializing = false;
+        // Let the router handle the initial route - this should be the ONLY navigation call
+        router.handleRouteChange();
     }
 });
-
 // Root route
 router.addRoute('/', async () => {
     console.log('Root route handler called');
@@ -76,39 +87,40 @@ router.addRoute('/', async () => {
         
         // Get the most up-to-date user data
         try {
-            // Force refresh user data from the server
-            console.log('Refreshing user data...');
-            await auth.init();
+            // Only refresh if we don't have role data
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.role && !user.Role) {
+                console.log('Refreshing user data...');
+                await auth.init();
+            }
             
             // Get the user from localStorage (should now be updated)
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            console.log('Refreshed user data:', user);
+            const updatedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            console.log('User data for redirection:', updatedUser);
             
             // Ensure we have a valid role
-            if (!user.role && !user.Role) {
+            if (!updatedUser.role && !updatedUser.Role) {
                 console.error('No role found in user data after refresh');
                 throw new Error('No role found in user data');
             }
             
             // Redirect based on role
-            redirectBasedOnRole(user);
+            redirectBasedOnRole(updatedUser);
             
         } catch (refreshError) {
             console.error('Error refreshing user data:', refreshError);
-            // Fall back to existing localStorage data
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            console.log('Using existing user data:', user);
-            redirectBasedOnRole(user);
+            // Clear auth and redirect to login
+            auth.clearAuthData();
+            router.navigateTo('/login');
         }
         
     } catch (error) {
         console.error('Error in root route handler:', error);
         // Clear potentially corrupted auth state
-        
+        auth.clearAuthData();
         router.navigateTo('/login');
     }
 }, { exact: true });
-
 // Helper function to handle role-based redirection
 function redirectBasedOnRole(user) {
     console.log('=== redirectBasedOnRole called ===');
@@ -119,7 +131,6 @@ function redirectBasedOnRole(user) {
         router.navigateTo('/login');
         return;
     }
-
     // Normalize the user object to ensure consistent property names
     const normalizedUser = {
         ...user,
@@ -128,7 +139,6 @@ function redirectBasedOnRole(user) {
         // Ensure we have the most complete user data by merging with localStorage
         ...(JSON.parse(localStorage.getItem('user') || '{}'))
     };
-
     console.log('Normalized user object:', JSON.stringify(normalizedUser, null, 2));
     
     // Get the role (case-insensitive)
@@ -153,10 +163,18 @@ function redirectBasedOnRole(user) {
         router.navigateTo('/dashboard/employee');
     }
 }
-
 // Login route
 router.addRoute('/login', async () => {
     console.log('Login route handler called');
+    
+    // If already authenticated, redirect to appropriate dashboard
+    if (auth.isAuthenticated()) {
+        console.log('User already authenticated, redirecting to dashboard');
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        redirectBasedOnRole(user);
+        return;
+    }
+    
     try {
         // Clear any existing content
         const appElement = document.getElementById('app');
@@ -181,7 +199,6 @@ router.addRoute('/login', async () => {
         }
     }
 }, { exact: true });
-
 // Dashboard routes
 router.addRoute('/dashboard/employee', async () => {
     console.log('Employee dashboard route handler called');
@@ -197,7 +214,6 @@ router.addRoute('/dashboard/employee', async () => {
         router.navigateTo('/login');
     }
 }, { exact: true });
-
 router.addRoute('/dashboard/manager', async () => {
     console.log('Manager dashboard route handler called');
     if (!auth.isAuthenticated()) {
@@ -212,7 +228,6 @@ router.addRoute('/dashboard/manager', async () => {
         router.navigateTo('/login');
     }
 }, { exact: true });
-
 // Main dashboard route - handles redirection to appropriate dashboard
 router.addRoute('/dashboard', async () => {
     console.log('Dashboard route handler called');
@@ -233,7 +248,6 @@ router.addRoute('/dashboard', async () => {
         router.navigateTo('/login');
     }
 }, { exact: true });
-
 // Projects route (for managers)
 router.addRoute('/dashboard/projects', async () => {
     console.log('Projects route handler called');
@@ -295,7 +309,6 @@ router.addRoute('/dashboard/projects', async () => {
         router.navigateTo('/dashboard');
     }
 });
-
 // Catch-all dashboard routes
 router.addRoute('/dashboard/*', () => {
     console.log('Catch-all dashboard route handler called');
@@ -320,11 +333,11 @@ router.addRoute('/dashboard/*', () => {
         }
     }
 });
-
 // Handle back/forward browser buttons
 window.addEventListener('popstate', () => {
-    router.handleRouteChange();
+    // Add a small delay to prevent conflicts with other navigation
+    setTimeout(() => {
+        router.handleRouteChange();
+    }, 10);
 });
-
-// Handle initial route
-router.handleRouteChange();
+// Don't call handleRouteChange here - it's called in DOMContentLoaded

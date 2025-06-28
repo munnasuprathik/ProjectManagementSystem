@@ -7,13 +7,11 @@ const Auth = { getInstance: () => auth };
 import { createPieChart, createBarChart, createLineChart } from '../utils/uiComponents.js';
 import { 
     showToast, 
-    
     formatWorkload, 
     formatStatusBadge, 
     formatPriorityBadge,
     showLoading 
 } from '../utils/uiUtils.js';
-
 
 // Initialize dashboard based on user role
 async function initializeDashboard() {
@@ -427,6 +425,10 @@ export async function renderManagerDashboard() {
             dashboardContent.classList.remove('d-none');
             console.log('Dashboard content displayed');
         }
+        
+        // Initialize project creation form AFTER dashboard is rendered
+        initProjectCreationForm();
+        
     } catch (error) {
         console.error('Error loading manager dashboard:', error);
         showToast('Failed to load dashboard data', 'error');
@@ -1394,7 +1396,7 @@ function initDropdowns() {
     });
 }
 
-// Render work items list in the modal
+// Render work items list in the modal - THIS IS THE KEY FUNCTION FOR REVIEW FUNCTIONALITY
 function renderWorkItemsList(workItems) {
     console.log('Rendering work items:', workItems);
     const container = document.getElementById('workItemsList');
@@ -1453,11 +1455,11 @@ function renderWorkItemsList(workItems) {
             // Format deadline
             const deadline = item.Deadline ? formatDate(item.Deadline) : 'No deadline';
             
-            // Check if current user is a manager and item is in review
+            // Check if current user is a manager and item is in review - THIS IS THE KEY PART
             const isManager = window.auth && window.auth.currentUser && window.auth.currentUser.role === 'Manager';
             const isInReview = status.toLowerCase() === 'review';
             
-            // Create status dropdown for managers when item is in review
+            // Create status dropdown for managers when item is in review - THIS CREATES THE APPROVE/REJECT DROPDOWN
             let statusControl = '';
             if (isManager && isInReview) {
                 const dropdownId = 'statusDropdown' + (item.WorkItemId || Date.now());
@@ -1478,7 +1480,7 @@ function renderWorkItemsList(workItems) {
                     '</div>'
                 ].join('');
             } else {
-                statusControl = '<span class="badge ' + statusColor + ' text-black">' + escapeHtml(status) + '</span>';
+                statusControl = '<span class="badge bg-' + statusColor + ' text-black">' + escapeHtml(status) + '</span>';
             }
             
             // Create the row HTML using string concatenation instead of template literals in array
@@ -1499,7 +1501,6 @@ function renderWorkItemsList(workItems) {
                 '  <td><span class="badge ' + priorityClass + '">' + escapeHtml(priority) + '</span></td>',
                 '  <td>' + escapeHtml(item.AssignedToName || item.AssignedTo || 'Unassigned') + '</td>',
                 '  <td>' + deadline + '</td>',
-
                 '</tr>'
             ].join('');
         }).join('');
@@ -1527,11 +1528,11 @@ function escapeHtml(unsafe) {
     if (!unsafe) return '';
     return unsafe
         .toString()
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+        .replace(/&/g, '&')
+        .replace(/</g, '<')
+        .replace(/>/g, '>')
+        .replace(/"/g, '"')
+        .replace(/'/g, '&#39;');
 }
 
 // Initialize project creation form
@@ -1543,21 +1544,18 @@ function initProjectCreationForm() {
         return;
     }
 
+    // Remove any existing event listeners to prevent duplicates
+    const existingHandler = form._submitHandler;
+    if (existingHandler) {
+        form.removeEventListener('submit', existingHandler);
+    }
+
     // Ensure toast container exists
     if (!document.querySelector('.toast-container')) {
         const toastContainer = document.createElement('div');
         toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
         toastContainer.style.zIndex = '1090';
         document.body.appendChild(toastContainer);
-    }
-    
-    // Add click handler to the submit button instead of form submit
-    const submitBtn = form.querySelector('button[type="submit"]');
-    if (submitBtn) {
-        submitBtn.addEventListener('click', handleFormSubmit);
-        console.log('Added click handler to submit button');
-    } else {
-        console.error('Submit button not found in the form!');
     }
     
     // Handle form submission
@@ -1569,12 +1567,12 @@ function initProjectCreationForm() {
         try {
             const formData = new FormData(form);
             const projectData = {
-                projectName: formData.get('projectName'),
-                description: formData.get('projectDescription'),
+                projectName: formData.get('projectName')?.trim(),
+                description: formData.get('projectDescription')?.trim() || '',
+                requirements: formData.get('requirements')?.trim() || '',
+                priority: formData.get('priority') || 'Medium',
                 startDate: formData.get('startDate'),
-                deadline: formData.get('deadline'),
-                requirements: formData.get('requirements'),
-                priority: formData.get('priority')
+                deadline: formData.get('deadline')
             };
             
             console.log('Form data collected:', projectData);
@@ -1582,11 +1580,11 @@ function initProjectCreationForm() {
             // Validate required fields
             const errors = [];
             
-            if (!projectData.projectName?.trim()) {
+            if (!projectData.projectName) {
                 errors.push('Project name is required');
             }
             
-            if (!projectData.requirements?.trim()) {
+            if (!projectData.requirements) {
                 errors.push('Requirements are required');
             }
             
@@ -1623,32 +1621,45 @@ function initProjectCreationForm() {
                 if (btnText) btnText.textContent = 'Creating...';
             }
             
-            console.log('Sending project creation request...');
-            const result = await api.createProject(projectData);
-            console.log('Project creation response:', result);
+            console.log('Sending project creation request...', JSON.stringify(projectData, null, 2));
             
-            if (result && result.success) {
-                showToast('Project created successfully!', 'success');
-                console.log('Project created successfully');
+            try {
+                const result = await api.createProject(projectData);
+                console.log('Project creation response:', result);
                 
-                // Close the modal
-                const modal = bootstrap.Modal.getInstance(document.getElementById('createProjectModal'));
-                if (modal) {
-                    modal.hide();
-                    console.log('Modal closed');
+                if (result && !result.error) {
+                    showToast('Project created successfully!', 'success');
+                    console.log('Project created successfully');
+                    
+                    // Close the modal
+                    const modalElement = document.getElementById('createProjectModal');
+                    if (modalElement) {
+                        const modal = bootstrap.Modal.getInstance(modalElement);
+                        if (modal) {
+                            modal.hide();
+                            console.log('Modal closed');
+                        }
+                    }
+                    
+                    // Reset form
+                    form.reset();
+                    console.log('Form reset');
+                    
+                    // Refresh the dashboard
+                    await renderManagerDashboard();
+                    console.log('Dashboard refreshed');
+                    return true;
+                } else {
+                    const errorMsg = result?.message || result?.error || 'Failed to create project. Please try again.';
+                    console.error('Project creation failed:', errorMsg);
+                    showToast(errorMsg, 'error');
+                    return false;
                 }
-                
-                // Reset form
-                form.reset();
-                console.log('Form reset');
-                
-                // Refresh the dashboard
-                await renderManagerDashboard();
-                console.log('Dashboard refreshed');
-            } else {
-                const errorMsg = result?.message || 'Failed to create project. Please try again.';
-                console.error('Project creation failed:', errorMsg);
+            } catch (apiError) {
+                console.error('API Error:', apiError);
+                const errorMsg = apiError?.message || 'An error occurred while creating the project.';
                 showToast(errorMsg, 'error');
+                return false;
             }
         } catch (error) {
             console.error('Error in form submission:', error);
@@ -1678,58 +1689,12 @@ function initProjectCreationForm() {
             }
         }
     }
+    
+    // Store the handler reference and add the event listener
+    form._submitHandler = handleFormSubmit;
+    form.addEventListener('submit', handleFormSubmit);
+    console.log('Form submit handler added');
 }
-
-// Initialize the dashboard when the page loads
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        console.log('DOM fully loaded, initializing dashboard...');
-        
-        // Create toast container if it doesn't exist
-        if (!document.querySelector('.toast-container')) {
-            const toastContainer = document.createElement('div');
-            toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-            toastContainer.style.zIndex = '1090';
-            document.body.appendChild(toastContainer);
-            console.log('Toast container created');
-        }
-
-        // Initialize Bootstrap dropdowns
-        const initDropdowns = () => {
-            const dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'));
-            dropdownElementList.map(function (dropdownToggleEl) {
-                return new bootstrap.Dropdown(dropdownToggleEl);
-            });
-        };
-        
-        // Initialize project creation form
-        initProjectCreationForm();
-        console.log('Project creation form initialized');
-
-        // Check authentication
-        const auth = await Auth.getInstance();
-        if (!auth.currentUser) {
-            window.location.href = '/login';
-            return;
-        }
-
-        // Store auth in window for easy access in other functions
-        window.auth = auth;
-
-        // Load the appropriate dashboard based on user role
-        if (auth.currentUser.role === 'Manager') {
-            await renderManagerDashboard();
-        } else {
-            await renderEmployeeDashboard();
-        }
-        
-        // Initialize dropdowns after content is loaded
-        initDropdowns();
-    } catch (error) {
-        console.error('Error initializing dashboard:', error);
-        showToast('Failed to initialize dashboard', 'error');
-    }
-});
 
 // Export functions that might be used by other files
 export async function renderEmployeeDashboard() {
@@ -1847,9 +1812,6 @@ export async function renderEmployeeDashboard() {
             new bootstrap.Tooltip(tooltipTriggerEl);
         });
         
-        // Initialize project creation form
-        initProjectCreationForm();
-        
     } catch (error) {
         console.error('Error loading employee dashboard:', error);
         showToast('Failed to load dashboard data', 'error');
@@ -1934,4 +1896,10 @@ export async function renderEmployeeDashboard() {
             }
         }
     }
+}
+
+// Stub function for setupEventListeners (if needed)
+function setupEventListeners() {
+    // This function can be used to set up any additional event listeners
+    console.log('Setting up event listeners...');
 }

@@ -1,138 +1,69 @@
-import { auth } from './auth.js';
 
+import { auth } from './auth.js';
 class Router {
     constructor() {
         this.routes = [];
-        this.currentRoute = null;
+        this.currentPath = '';
+        this.isNavigating = false;
         this.authRequired = [];
         this.managerOnly = [];
-        this.isNavigating = false;  // Add navigation lock
-        this.navigationTimeout = null;  // Add timeout for debouncing
-        this.initEventListeners();
+        this.listen();
     }
-
     static getInstance() {
         if (!Router.instance) {
             Router.instance = new Router();
         }
         return Router.instance;
     }
-
-    initEventListeners() {
-        // Handle browser back/forward
+    listen() {
         window.addEventListener('popstate', () => this.handleRouteChange());
-        
-        // Handle link clicks
-        document.addEventListener('click', (e) => {
-            // Handle data-link attributes
-            if (e.target.matches('[data-link]')) {
-                e.preventDefault();
-                const path = e.target.getAttribute('href');
-                this.navigateTo(path);
-                return;
-            }
-            
-            // Handle parent elements with data-link
-            const linkElement = e.target.closest('[data-link]');
-            if (linkElement) {
-                e.preventDefault();
-                const path = linkElement.getAttribute('href');
-                this.navigateTo(path);
-            }
-        });
     }
-
-    addRoute(path, component, options = {}) {
+    addRoute(path, handler, options = {}) {
         const route = {
             path,
-            component,
+            handler,
             exact: options.exact || false,
             authRequired: options.authRequired || false,
             managerOnly: options.managerOnly || false,
             title: options.title || 'Project Management System'
         };
-
         this.routes.push(route);
-
         if (route.authRequired) {
             this.authRequired.push(path);
         }
-
         if (route.managerOnly) {
             this.managerOnly.push(path);
         }
-
         return this;
     }
-
     async handleRouteChange() {
-        // Prevent multiple simultaneous route changes
-        if (this.isNavigating) {
-            console.log('Navigation already in progress, skipping...');
-            return;
-        }
-
-        // Clear any existing timeout
-        if (this.navigationTimeout) {
-            clearTimeout(this.navigationTimeout);
-        }
-
-        // Set navigation lock
-        this.isNavigating = true;
-
+        if (this.isNavigating) return;
+        
+        const path = window.location.pathname;
+        const route = this.findMatchingRoute(path);
+        
         try {
-            const path = window.location.pathname;
-            console.log('Handling route change to:', path);
+            this.isNavigating = true;
             
-            const appElement = document.getElementById('app');
-            if (!appElement) {
-                console.error('App element not found in the DOM');
-                return;
-            }
-
-            const route = this.findMatchingRoute(path);
-            const currentPath = window.location.pathname;
-
-            // Check authentication - but NOT for login page
-            if (route?.authRequired && !auth.isAuthenticated() && currentPath !== '/login') {
-                console.log('Route requires authentication, redirecting to login...');
-                sessionStorage.setItem('redirectAfterLogin', currentPath);
-                this.navigateTo('/login');
-                return;
-            }
-
-            // Check authorization for manager-only routes
-            if (route?.managerOnly && !auth.isManager()) {
-                this.navigateTo('/unauthorized');
-                return;
-            }
-
-            // Update document title
-            document.title = route?.title || 'Project Management System';
-
-            // Call the component function to render the view
-            if (route?.component) {
-                try {
-                    await route.component();
-                    this.currentRoute = route;
-                } catch (error) {
-                    console.error('Error rendering route:', error);
-                    this.navigateTo('/error');
-                }
+            if (route) {
+                await route.handler();
             } else {
-                this.navigateTo('/not-found');
+                console.error('No route found for path:', path);
+                // Only redirect to login if not already there to prevent loops
+                if (path !== '/login') {
+                    this.replace('/login');
+                }
             }
         } catch (error) {
-            console.error('Error in handleRouteChange:', error);
-            this.navigateTo('/error');
+            console.error('Error in route handler:', error);
+            // Redirect to login on auth errors, but not if already on login page
+            if (error.message === 'Unauthorized' && window.location.pathname !== '/login') {
+                this.replace('/login');
+            }
         } finally {
-            // Clear navigation lock after a short delay to prevent rapid re-navigation
-            this.navigationTimeout = setTimeout(() => {
-                this.isNavigating = false;
-            }, 100);
+            this.isNavigating = false;
         }
     }
-
     findMatchingRoute(path) {
         console.log('Finding matching route for path:', path);
         
@@ -171,43 +102,61 @@ class Router {
         console.log('No matching route found for path:', path);
         return null;
     }
-
-    navigateTo(path, data = {}) {
-        console.log('Navigating to:', path, 'with data:', data);
+    async navigateTo(path, data = {}) {
+        // Skip if already navigating or already at the target path
+        if (this.isNavigating || window.location.pathname === path) {
+            return;
+        }
+        // Ensure path starts with a slash
+        const normalizedPath = path.startsWith('/') ? path : `/${path}`;
         
-        // Prevent navigation to current path
-        if (path === window.location.pathname) {
-            console.log('Already at path:', path);
-            return;
+        // Store any data needed for the route
+        if (Object.keys(data).length > 0) {
+            sessionStorage.setItem('routeData', JSON.stringify(data));
         }
-
-        // Prevent navigation if already navigating
-        if (this.isNavigating) {
-            console.log('Navigation already in progress, skipping...');
-            return;
-        }
-
         try {
-            // Ensure path starts with a slash
-            const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-            
-            // Store any data needed for the route
-            if (Object.keys(data).length > 0) {
-                sessionStorage.setItem('routeData', JSON.stringify(data));
-            }
-
+            this.isNavigating = true;
             console.log('Updating browser history to:', normalizedPath);
             window.history.pushState({}, '', normalizedPath);
             
             console.log('Handling route change...');
-            this.handleRouteChange();
+            await this.handleRouteChange();
         } catch (error) {
             console.error('Error during navigation:', error);
             // Fallback to direct URL change if pushState fails
-            window.location.href = path;
+            window.location.href = normalizedPath;
+        } finally {
+            this.isNavigating = false;
         }
     }
-
+    
+    async replace(path, data = {}) {
+        // Skip if already navigating or already at the target path
+        if (this.isNavigating || window.location.pathname === path) {
+            return;
+        }
+        // Ensure path starts with a slash
+        const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+        
+        // Store any data needed for the route
+        if (Object.keys(data).length > 0) {
+            sessionStorage.setItem('routeData', JSON.stringify(data));
+        }
+        try {
+            this.isNavigating = true;
+            console.log('Replacing browser history with:', normalizedPath);
+            window.history.replaceState({}, '', normalizedPath);
+            
+            console.log('Handling route change...');
+            await this.handleRouteChange();
+        } catch (error) {
+            console.error('Error during navigation:', error);
+            // Fallback to direct URL change if replaceState fails
+            window.location.replace(normalizedPath);
+        } finally {
+            this.isNavigating = false;
+        }
+    }
     getRouteData() {
         const data = sessionStorage.getItem('routeData');
         if (data) {
@@ -216,14 +165,11 @@ class Router {
         }
         return null;
     }
-
     start() {
         this.handleRouteChange();
     }
 }
-
 // Create a singleton instance
 const router = new Router();
-
 // Export for use in other modules
 export { router, Router };
