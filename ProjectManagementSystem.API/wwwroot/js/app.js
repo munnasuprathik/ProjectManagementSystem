@@ -87,16 +87,24 @@ router.addRoute('/', async () => {
         
         // Get the most up-to-date user data
         try {
-            // Only refresh if we don't have role data
+            // Get current user data from localStorage
             const user = JSON.parse(localStorage.getItem('user') || '{}');
-            if (!user.role && !user.Role) {
-                console.log('Refreshing user data...');
-                await auth.init();
+            console.log('User data for redirection:', user);
+            
+            // If we have a valid role, redirect immediately
+            if (user.role || user.Role) {
+                console.log('Using existing user data for redirection');
+                redirectBasedOnRole(user);
+                return;
             }
             
-            // Get the user from localStorage (should now be updated)
+            // If we get here, we need to refresh user data
+            console.log('Refreshing user data...');
+            await auth.init();
+            
+            // Get the updated user data
             const updatedUser = JSON.parse(localStorage.getItem('user') || '{}');
-            console.log('User data for redirection:', updatedUser);
+            console.log('Updated user data:', updatedUser);
             
             // Ensure we have a valid role
             if (!updatedUser.role && !updatedUser.Role) {
@@ -128,9 +136,10 @@ function redirectBasedOnRole(user) {
     
     if (!user) {
         console.error('No user object provided to redirectBasedOnRole');
-        router.navigateTo('/login');
+        window.location.href = '/login';
         return;
     }
+    
     // Normalize the user object to ensure consistent property names
     const normalizedUser = {
         ...user,
@@ -139,6 +148,7 @@ function redirectBasedOnRole(user) {
         // Ensure we have the most complete user data by merging with localStorage
         ...(JSON.parse(localStorage.getItem('user') || '{}'))
     };
+    
     console.log('Normalized user object:', JSON.stringify(normalizedUser, null, 2));
     
     // Get the role (case-insensitive)
@@ -147,7 +157,7 @@ function redirectBasedOnRole(user) {
     
     if (!userRole) {
         console.error('No valid role found in user object');
-        router.navigateTo('/login');
+        window.location.href = '/login';
         return;
     }
     
@@ -155,12 +165,15 @@ function redirectBasedOnRole(user) {
     localStorage.setItem('user', JSON.stringify(normalizedUser));
     
     // Check for manager role (case-insensitive)
-    if (userRole === 'manager') {
-        console.log('Role identified as Manager - redirecting to manager dashboard');
-        router.navigateTo('/dashboard/manager');
-    } else {
-        console.log(`Role '${userRole}' is not Manager - redirecting to employee dashboard`);
-        router.navigateTo('/dashboard/employee');
+    const targetPath = userRole === 'manager' 
+        ? '/dashboard/manager' 
+        : '/dashboard/employee';
+    
+    console.log(`Redirecting to: ${targetPath}`);
+    
+    // Use direct navigation as fallback
+    if (window.location.pathname !== targetPath) {
+        window.location.href = targetPath;
     }
 }
 // Login route
