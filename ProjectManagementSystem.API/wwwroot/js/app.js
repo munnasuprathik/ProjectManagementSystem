@@ -176,6 +176,28 @@ function redirectBasedOnRole(user) {
         window.location.href = targetPath;
     }
 }
+// Register route
+router.addRoute('/register', async () => {
+    console.log('Register route handler called');
+    
+    // If already authenticated, redirect to appropriate dashboard
+    if (auth.isAuthenticated()) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        redirectBasedOnRole(user);
+        return;
+    }
+    
+    // Render the register view
+    try {
+        const { renderRegisterView } = await import('./views/auth.js');
+        await renderRegisterView();
+    } catch (error) {
+        console.error('Error loading register view:', error);
+        // Fallback to login if there's an error
+        router.navigateTo('/login');
+    }
+}, { exact: true });
+
 // Login route
 router.addRoute('/login', async () => {
     console.log('Login route handler called');

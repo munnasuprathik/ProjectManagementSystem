@@ -360,7 +360,7 @@ async function handleRegister(e) {
                 return;
             }
         } else {
-            throw new Error(result?.message || 'Registration successful but no token received. Please log in.');
+            throw new Error(result?.message || 'Registration successful. Please log in.');
         }
     } catch (error) {
         console.error('Registration error:', error);
