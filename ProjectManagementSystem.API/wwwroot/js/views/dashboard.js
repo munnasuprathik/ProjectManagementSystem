@@ -852,9 +852,30 @@ function renderWorkItemsTable(workItems, containerId, showProject = true) {
         
         const projectCell = showProject ? '<td>' + escapeHtml(item.ProjectName || 'N/A') + '</td>' : '';
         
-        // Build action buttons based on status
+        // Build action buttons based on status and user role
+        const isManager = window.auth && window.auth.currentUser && window.auth.currentUser.role === 'Manager';
+        const isInReview = item.Status === 'Review';
+        
         let actionButtons = '';
-        if (item.Status !== 'Done' && item.Status !== 'Cancelled') {
+        
+        if (isManager && isInReview) {
+            // Manager view for items in Review status
+            actionButtons = [
+                '<div class="btn-group btn-group-sm">',
+                '  <button type="button" class="btn btn-outline-success update-status-btn"',
+                '          data-workitem-id="' + item.WorkItemId + '"',
+                '          data-new-status="Done">',
+                '    <i class="bi bi-check-circle me-1"></i>Approve',
+                '  </button>',
+                '  <button type="button" class="btn btn-outline-warning update-status-btn"',
+                '          data-workitem-id="' + item.WorkItemId + '"',
+                '          data-new-status="InProgress">',
+                '    <i class="bi bi-arrow-counterclockwise me-1"></i>Reject',
+                '  </button>',
+                '</div>'
+            ].join('\n');
+        } else if (item.Status !== 'Done' && item.Status !== 'Cancelled') {
+            // Regular user view for items not in Done/Cancelled status
             actionButtons = [
                 '<div class="btn-group btn-group-sm">'
             ];
@@ -879,6 +900,7 @@ function renderWorkItemsTable(workItems, containerId, showProject = true) {
             actionButtons.push('</div>');
             actionButtons = actionButtons.join('\n');
         } else {
+            // No action buttons for Done/Cancelled items
             actionButtons = [
                 '<div class="btn-group btn-group-sm">',
                 '</div>'
@@ -1086,6 +1108,63 @@ document.getElementById('addWorkItemForm')?.addEventListener('submit', async fun
 
 // Event delegation for all click events
 document.addEventListener('click', async function(event) {
+    // Handle Update Status button click (for work items in review)
+    const updateStatusBtn = event.target.closest('.update-status-btn');
+    if (updateStatusBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const workItemId = updateStatusBtn.getAttribute('data-workitem-id');
+        const newStatus = updateStatusBtn.getAttribute('data-new-status');
+        
+        if (!workItemId || !newStatus) {
+            console.error('Missing work item ID or status');
+            return;
+        }
+        
+        // Get the dropdown parent to close it
+        const dropdown = updateStatusBtn.closest('.dropdown-menu')?.previousElementSibling;
+        if (dropdown && dropdown._dropdown) {
+            dropdown._dropdown.hide();
+        }
+        
+        // Disable the button to prevent multiple clicks
+        const originalHTML = updateStatusBtn.innerHTML;
+        const originalDisabled = updateStatusBtn.disabled;
+        updateStatusBtn.disabled = true;
+        updateStatusBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Updating...';
+        
+        try {
+            await updateWorkItemStatus(workItemId, newStatus);
+            showToast('Work item status updated successfully!', 'success');
+            
+            // Close any open dropdowns
+            document.querySelectorAll('.dropdown-toggle').forEach(dropdown => {
+                if (dropdown._dropdown) {
+                    dropdown._dropdown.hide();
+                }
+            });
+            
+            // Refresh the dashboard
+            const auth = await Auth.getInstance();
+            if (auth.currentUser.role === 'Manager') {
+                await renderManagerDashboard();
+            } else {
+                await renderEmployeeDashboard();
+            }
+        } catch (error) {
+            console.error('Error updating work item status:', error);
+            showToast('Failed to update work item status', 'error');
+        } finally {
+            // Re-enable the button
+            if (updateStatusBtn) {
+                updateStatusBtn.disabled = originalDisabled;
+                updateStatusBtn.innerHTML = originalHTML;
+            }
+        }
+        return; // Exit the event handler
+    }
+    
     // Handle View Work Items button click
     const viewWorkItemsBtn = event.target.closest('.view-work-items-btn');
     if (viewWorkItemsBtn) {
@@ -1337,63 +1416,90 @@ document.addEventListener('click', async function(event) {
         return; // Exit the event handler
     }
     
-    // Handle status update button click
+    // Handle status update button click (legacy, keeping just in case)
     const updateBtn = event.target.closest('.update-status-btn');
-    if (!updateBtn) return;
-    
-    // Prevent any default form submission or link behavior
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-    
-    // If already processing, do nothing
-    if (updateBtn.disabled) return;
-    
-    const workItemId = updateBtn.dataset.workitemId;
-    const newStatus = updateBtn.dataset.newStatus;
-    
-    if (!workItemId || !newStatus) {
-        console.error('Missing work item ID or status');
-        return;
-    }
-    
-    // Disable the button to prevent multiple clicks
-    const originalText = updateBtn.innerHTML;
-    updateBtn.disabled = true;
-    updateBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating...';
-    
-    try {
-        await updateWorkItemStatus(workItemId, newStatus);
-        showToast('Work item status updated successfully!', 'success');
+    if (updateBtn) {
+        event.preventDefault();
+        event.stopPropagation();
         
-        // Refresh the dashboard
-        const auth = await Auth.getInstance();
-        if (auth.currentUser.role === 'Manager') {
-            await renderManagerDashboard();
-        } else {
-            await renderEmployeeDashboard();
+        const workItemId = updateBtn.dataset.workitemId;
+        const newStatus = updateBtn.dataset.newStatus;
+        
+        if (!workItemId || !newStatus) {
+            console.error('Missing work item ID or status');
+            return;
         }
-    } catch (error) {
-        console.error('Error updating work item status:', error);
-        showToast('Failed to update work item status', 'error');
-    } finally {
-        // Re-enable the button
-        if (updateBtn) {
-            updateBtn.disabled = false;
-            updateBtn.innerHTML = originalText;
+        
+        // Disable the button to prevent multiple clicks
+        const originalText = updateBtn.innerHTML;
+        updateBtn.disabled = true;
+        updateBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating...';
+        
+        try {
+            await updateWorkItemStatus(workItemId, newStatus);
+            showToast('Work item status updated successfully!', 'success');
+            
+            // Refresh the dashboard
+            const auth = await Auth.getInstance();
+            if (auth.currentUser.role === 'Manager') {
+                await renderManagerDashboard();
+            } else {
+                await renderEmployeeDashboard();
+            }
+        } catch (error) {
+            console.error('Error updating work item status:', error);
+            showToast('Failed to update work item status', 'error');
+        } finally {
+            // Re-enable the button
+            if (updateBtn) {
+                updateBtn.disabled = false;
+                updateBtn.innerHTML = originalText;
+            }
         }
     }
 });
 
 // Initialize Bootstrap dropdowns
 function initDropdowns() {
-    const dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'));
-    dropdownElementList.forEach(function (dropdownToggleEl) {
-        // Only initialize if not already initialized
-        if (!dropdownToggleEl._dropdown) {
-            dropdownToggleEl._dropdown = new bootstrap.Dropdown(dropdownToggleEl);
-        }
-    });
+    try {
+        // Get all dropdown toggles that haven't been initialized yet
+        const dropdownToggles = [].slice.call(document.querySelectorAll('.dropdown-toggle:not([data-bs-initialized])'));
+        
+        dropdownToggles.forEach(function (dropdownToggleEl) {
+            try {
+                // Mark as initialized
+                dropdownToggleEl.setAttribute('data-bs-initialized', 'true');
+                
+                // Initialize the dropdown
+                const dropdown = new bootstrap.Dropdown(dropdownToggleEl, {
+                    boundary: 'clippingParents',
+                    reference: 'toggle'
+                });
+                
+                // Store the dropdown instance on the element
+                dropdownToggleEl._dropdown = dropdown;
+                
+                // Add click handler to prevent default behavior
+                dropdownToggleEl.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+                
+                // Add click handler to dropdown items to prevent closing
+                const dropdownMenu = dropdownToggleEl.nextElementSibling;
+                if (dropdownMenu && dropdownMenu.classList.contains('dropdown-menu')) {
+                    dropdownMenu.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                    });
+                }
+                
+            } catch (error) {
+                console.error('Error initializing dropdown:', error);
+            }
+        });
+    } catch (error) {
+        console.error('Error in initDropdowns:', error);
+    }
 }
 
 // Render work items list in the modal - THIS IS THE KEY FUNCTION FOR REVIEW FUNCTIONALITY
@@ -1459,28 +1565,40 @@ function renderWorkItemsList(workItems) {
             const isManager = window.auth && window.auth.currentUser && window.auth.currentUser.role === 'Manager';
             const isInReview = status.toLowerCase() === 'review';
             
-            // Create status dropdown for managers when item is in review - THIS CREATES THE APPROVE/REJECT DROPDOWN
+            // Create status control - show dropdown only for items in Review status
             let statusControl = '';
-            if (isManager && isInReview) {
-                const dropdownId = 'statusDropdown' + (item.WorkItemId || Date.now());
+            
+            if (isInReview) {
+                // For items in Review status, show Approve/Reject buttons in a dropdown
                 statusControl = [
                     '<div class="dropdown">',
-                    '  <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"',
-                    '          id="' + dropdownId + '" data-bs-toggle="dropdown" aria-expanded="false">',
-                    '    <span class="me-1">' + escapeHtml(status) + '</span>',
+                    '  <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" id="reviewActions' + item.WorkItemId + '"',
+                    '          data-bs-toggle="dropdown" aria-expanded="false">',
+                    '    <i class="bi bi-gear me-1"></i>Review',
                     '  </button>',
-                    '  <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="' + dropdownId + '">',
-                    '    <li><button type="button" class="dropdown-item update-status-btn" data-workitem-id="' + item.WorkItemId + '" data-new-status="Done">',
-                    '      <i class="bi bi-check-circle-fill text-success me-1"></i> Approve (Mark as Done)',
-                    '    </button></li>',
-                    '    <li><button type="button" class="dropdown-item update-status-btn" data-workitem-id="' + item.WorkItemId + '" data-new-status="InProgress">',
-                    '      <i class="bi bi-arrow-counterclockwise text-warning me-1"></i> Reject (Send Back for Changes)',
-                    '    </button></li>',
+                    '  <ul class="dropdown-menu" aria-labelledby="reviewActions' + item.WorkItemId + '">',
+                    '    <li><a class="dropdown-item text-success update-status-btn" href="#" data-workitem-id="' + item.WorkItemId + '" data-new-status="Done">',
+                    '      <i class="bi bi-check-circle me-1"></i>Approve',
+                    '    </a></li>',
+                    '    <li><a class="dropdown-item text-warning update-status-btn" href="#" data-workitem-id="' + item.WorkItemId + '" data-new-status="InProgress">',
+                    '      <i class="bi bi-arrow-counterclockwise me-1"></i>Reject',
+                    '    </a></li>',
                     '  </ul>',
                     '</div>'
                 ].join('');
             } else {
-                statusControl = '<span class="badge bg-' + statusColor + ' text-black">' + escapeHtml(status) + '</span>';
+                // For other statuses, just show a badge
+                const statusBadgeClass = {
+                    'todo': 'bg-secondary',
+                    'inprogress': 'bg-primary',
+                    'review': 'bg-info text-dark',
+                    'done': 'bg-success',
+                    'cancelled': 'bg-dark'
+                }[status.toLowerCase()] || 'bg-secondary';
+                
+                statusControl = '<span class="badge ' + statusBadgeClass + '">' + 
+                              escapeHtml(status) + 
+                              '</span>';
             }
             
             // Create the row HTML using string concatenation instead of template literals in array
@@ -1505,11 +1623,127 @@ function renderWorkItemsList(workItems) {
             ].join('');
         }).join('');
         
-        // Initialize dropdowns after content is rendered
-        initDropdowns();
-        
         // Restore scroll position
         container.scrollTop = scrollPosition;
+        
+        // Initialize click handlers for status update buttons
+        container.querySelectorAll('.update-status-btn').forEach(btn => {
+            btn.addEventListener('click', async function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const workItemId = this.getAttribute('data-workitem-id');
+                const newStatus = this.getAttribute('data-new-status');
+                const originalHTML = this.innerHTML;
+                const parentRow = this.closest('tr');
+                
+                if (!workItemId || !newStatus) {
+                    console.error('Missing work item ID or status');
+                    return;
+                }
+                
+                // Update button state
+                const allButtons = parentRow.querySelectorAll('.update-status-btn');
+                allButtons.forEach(b => {
+                    b.disabled = true;
+                    b.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Updating...';
+                });
+                
+                try {
+                    // Update the work item status
+                    await updateWorkItemStatus(workItemId, newStatus);
+                    showToast('Work item status updated successfully!', 'success');
+                    
+                    // Get the project ID and name from the modal
+                    const projectId = document.querySelector('.view-review-tasks-btn[data-project-id]')?.dataset.projectId;
+                    const projectName = document.querySelector('.view-review-tasks-btn[data-project-name]')?.dataset.projectName;
+                    
+                    if (projectId) {
+                        // Re-fetch the work items for the current project
+                        try {
+                            const response = await api.getWorkItems({ projectId });
+                            let workItems = Array.isArray(response) ? response : (response.items || []);
+                            
+                            // Filter to only show items in 'Review' status
+                            workItems = workItems.filter(item => item.Status && item.Status.toLowerCase() === 'review');
+                            
+                            // Re-render the work items list
+                            renderWorkItemsList(workItems);
+                            
+                            // If no more review items, close the modal after a short delay
+                            if (workItems.length === 0) {
+                                setTimeout(() => {
+                                    const modal = bootstrap.Modal.getInstance(document.getElementById('viewWorkItemsModal'));
+                                    if (modal) modal.hide();
+                                }, 1500);
+                            }
+                            
+                            // Refresh the main dashboard to reflect changes
+                            const auth = await Auth.getInstance();
+                            if (auth.currentUser.role === 'Manager') {
+                                await renderManagerDashboard();
+                            } else {
+                                await renderEmployeeDashboard();
+                            }
+                            
+                        } catch (error) {
+                            console.error('Error refreshing work items:', error);
+                            // Even if refresh fails, still update the UI to reflect the change
+                            parentRow.remove();
+                            
+                            // If no more items, show empty state
+                            const remainingItems = container.querySelectorAll('tr').length;
+                            if (remainingItems === 0) {
+                                container.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No work items in review</td></tr>';
+                                setTimeout(() => {
+                                    const modal = bootstrap.Modal.getInstance(document.getElementById('viewWorkItemsModal'));
+                                    if (modal) modal.hide();
+                                }, 1500);
+                            }
+                            
+                            // Still refresh the dashboard
+                            const auth = await Auth.getInstance();
+                            if (auth.currentUser.role === 'Manager') {
+                                await renderManagerDashboard();
+                            } else {
+                                await renderEmployeeDashboard();
+                            }
+                        }
+                    } else {
+                        // If we can't get the project ID, just remove the row and refresh
+                        parentRow.remove();
+                        
+                        // If no more items, show empty state
+                        const remainingItems = container.querySelectorAll('tr').length;
+                        if (remainingItems === 0) {
+                            container.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No work items in review</td></tr>';
+                        }
+                        
+                        // Refresh the dashboard
+                        const auth = await Auth.getInstance();
+                        if (auth.currentUser.role === 'Manager') {
+                            await renderManagerDashboard();
+                        } else {
+                            await renderEmployeeDashboard();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error updating work item status:', error);
+                    showToast('Failed to update work item status', 'error');
+                    
+                    // Reset button state
+                    const allButtons = parentRow.querySelectorAll('.update-status-btn');
+                    allButtons.forEach(b => {
+                        b.disabled = false;
+                        if (b.getAttribute('data-new-status') === 'Done') {
+                            b.innerHTML = '<i class="bi bi-check-circle me-1"></i>Approve';
+                        } else {
+                            b.innerHTML = '<i class="bi bi-arrow-counterclockwise me-1"></i>Reject';
+                        }
+                    });
+                }
+            });
+        });
         
     } catch (error) {
         console.error('Error rendering work items:', error);
