@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (!isAuthenticated) {
             console.log('User not authenticated, will redirect to login via router');
-            // Don't call navigateTo here - let the router handle it
+            
         } else {
             // Get user data from localStorage
             const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -375,4 +375,4 @@ window.addEventListener('popstate', () => {
         router.handleRouteChange();
     }, 10);
 });
-// Don't call handleRouteChange here - it's called in DOMContentLoaded
+

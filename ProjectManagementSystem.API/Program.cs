@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
 using ProjectManagementSystem.API.Data;
 using ProjectManagementSystem.API.Models;
 using ProjectManagementSystem.API.Services;
@@ -115,13 +114,10 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// Configure CORS to allow all origins, methods, and headers for development
-var isDevelopment = builder.Environment.IsDevelopment();
+// Configure CORS for development
 var allowedOrigins = new[]
 {
-    "http://localhost:3000",  // React default
-    "http://localhost:5000",  // .NET default HTTP
-    "http://localhost:5162"   // Your custom HTTP port
+    "http://localhost:5162"   // Only allow the port we're running on
 };
 
 builder.Services.AddCors(options =>
@@ -131,13 +127,7 @@ builder.Services.AddCors(options =>
         builder.WithOrigins(allowedOrigins)
                .AllowAnyMethod()
                .AllowAnyHeader()
-               .AllowCredentials()
                .WithExposedHeaders("Content-Disposition");
-
-        if (isDevelopment)
-        {
-            builder.SetIsOriginAllowed(origin => true); // Allow any origin in development
-        }
     });
 });
 
@@ -172,63 +162,11 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
     serverOptions.Limits.RequestHeadersTimeout = TimeSpan.FromMinutes(1);
 });
 
-// Disable HTTPS redirection in development
-if (builder.Environment.IsDevelopment())
-{
-    builder.Services.AddHttpsRedirection(options =>
-    {
-        options.HttpsPort = 5001; // Default HTTPS port for development
-    });
-}
-else
-{
-    builder.Services.AddHttpsRedirection(options =>
-    {
-        options.HttpsPort = 443; // Standard HTTPS port for production
-    });
-}
-
 // Add routing
 builder.Services.AddRouting(options => options.LowercaseUrls = true);
 
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
 builder.Services.AddEndpointsApiExplorer();
-
-// Configure Swagger
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Project Management System API", Version = "v1" });
-    
-    // Add JWT Authentication to Swagger
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Description = @"JWT Authorization header using the Bearer scheme. 
-                      Enter 'Bearer' [space] and then your token in the text input below.
-                      Example: 'Bearer 12345abcdef'",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
-
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                },
-                Scheme = "oauth2",
-                Name = "Bearer",
-                In = ParameterLocation.Header
-            },
-            new List<string>()
-        }
-    });
-});
 
 var app = builder.Build();
 
@@ -237,15 +175,8 @@ if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
     
-    // Enable detailed error pages
+    // Enable detailed error pages in development
     app.UseStatusCodePages();
-    
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Project Management System API v1");
-        c.RoutePrefix = "swagger";
-    });
 }
 else
 {
@@ -263,11 +194,7 @@ app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// In development, we're using HTTP only
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection();
-}
+// HTTP only - no HTTPS redirection
 
 // Configure static files with proper MIME types and caching
 var provider = new FileExtensionContentTypeProvider();
@@ -293,12 +220,6 @@ app.UseStaticFiles(new StaticFileOptions
 // Enable response compression
 app.UseResponseCompression();
 
-// Enable request localization if needed
-var supportedCultures = new[] { "en-US" };
-app.UseRequestLocalization(options =>
-    options.AddSupportedCultures(supportedCultures)
-           .AddSupportedUICultures(supportedCultures)
-           .SetDefaultCulture(supportedCultures[0]));
 
 // Map controllers with route attributes
 app.MapControllers();
