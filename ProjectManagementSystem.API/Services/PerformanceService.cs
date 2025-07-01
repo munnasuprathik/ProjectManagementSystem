@@ -10,31 +10,18 @@ namespace ProjectManagementSystem.API.Services
 {
     public interface IPerformanceService
     {
-        /// <summary>
-        /// Updates the user's performance when their work item is rejected
-        /// </summary>
+        
         Task UpdateOnWorkItemRejectedAsync(string userId);
         
-        /// <summary>
-        /// Updates the user's performance when their work item is approved
-        /// </summary>
+      
         Task UpdateOnWorkItemApprovedAsync(string userId);
         
-        /// <summary>
-        /// Checks if a user is eligible to receive new work item assignments
-        /// </summary>
         Task<bool> IsEligibleForNewAssignmentsAsync(string userId);
         
-        /// <summary>
-        /// Gets the current performance score for a user
-        /// </summary>
+       
         Task<decimal> GetPerformanceScoreAsync(string userId);
         
-        /// <summary>
-        /// Updates performance metrics when a work item status changes
-        /// </summary>
-        /// <param name="userId">The ID of the user</param>
-        /// <param name="isAccepted">True if the work item was accepted, false if rejected</param>
+        
         Task UpdatePerformanceMetricsAsync(string userId, bool isAccepted);
     }
 

@@ -191,8 +191,7 @@ namespace ProjectManagementSystem.API.Controllers
 
         private async Task<List<PerformanceHistoryDto>> GetPerformanceHistory(string userId, int days)
         {
-            // In a real app, you would have historical performance data
-            // For now, we'll return the current performance for each of the last 'days' days
+            
             var performance = await _context.UserProfiles
                 .Where(up => up.UserId == userId)
                 .Select(up => up.Performance)
@@ -203,8 +202,7 @@ namespace ProjectManagementSystem.API.Controllers
             
             for (int i = days - 1; i >= 0; i--)
             {
-                // In a real app, you would have historical data for each day
-                // For now, we'll just use the current performance
+                
                 history.Add(new PerformanceHistoryDto
                 {
                     Date = today.AddDays(-i),

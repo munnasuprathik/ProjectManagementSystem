@@ -10,24 +10,13 @@ namespace ProjectManagementSystem.API.Services
 {
     public interface IWorkloadService
     {
-        /// <summary>
-        /// Checks if a new work item can be assigned to the user
-        /// </summary>
         Task<bool> CanAssignWorkItemAsync(string userId);
         
-        /// <summary>
-        /// Updates the user's workload percentage based on their active work items
-        /// </summary>
+    
         Task UpdateWorkloadAsync(string userId);
         
-        /// <summary>
-        /// Calculates the current workload percentage for a user
-        /// </summary>
         Task<decimal> CalculateWorkloadPercentageAsync(string userId);
         
-        /// <summary>
-        /// Gets the count of active work items for a user
-        /// </summary>
         Task<int> GetActiveWorkItemCountAsync(string userId);
     }
 
@@ -117,10 +106,8 @@ namespace ProjectManagementSystem.API.Services
             {
                 var activeCount = await GetActiveWorkItemCountAsync(userId);
                 
-                // Calculate workload percentage
                 var percentage = (decimal)activeCount / MAX_ACTIVE_WORK_ITEMS * 100;
                 
-                // Cap at 100%
                 return Math.Min(percentage, 100.0m);
             }
             catch (Exception ex)
@@ -140,7 +127,7 @@ namespace ProjectManagementSystem.API.Services
 
             try
             {
-                // Count active work items (ToDo, InProgress, Review)
+               
                 return await _context.WorkItems
                     .CountAsync(wi => wi.AssignedToId == userId && 
                                    (wi.Status == "ToDo" || wi.Status == "InProgress" || wi.Status == "Review"));

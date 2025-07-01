@@ -998,14 +998,6 @@ function initManagerCharts(dashboardData) {
     console.log('=== DEBUG: Dashboard Data Structure ===');
     console.log('All dashboard data keys:', Object.keys(dashboardData));
     
-    // Charts have been removed as per user request
-    // - Removed Work Items by Status chart
-    // - Removed Team Workload Distribution chart
-    
-    // The following chart initialization code has been removed:
-    // - Work Items by Status Pie Chart
-    // - Employees by Workload Bar Chart
-    
     console.log('Charts have been removed from the dashboard as per user request');
 }
 

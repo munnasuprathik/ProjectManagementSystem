@@ -22,7 +22,6 @@ namespace ProjectManagementSystem.API.Data
             {
                 _logger.LogInformation("Starting database seeding...");
                 
-                // Create roles if they don't exist
                 string[] roles = { "Manager", "Employee" };
                 foreach (var role in roles)
                 {
@@ -34,7 +33,7 @@ namespace ProjectManagementSystem.API.Data
                     }
                 }
 
-                // Create manager user if it doesn't exist
+                
                 var managerEmail = "manager@company.com";
                 var managerUser = await userManager.FindByEmailAsync(managerEmail);
                 
